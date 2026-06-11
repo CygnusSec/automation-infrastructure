@@ -1,0 +1,18 @@
+services:
+  terraform:
+    image: ${TERRAFORM_IMAGE:-terraform-vmware-vcenter-runtime:1.8.5}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        TERRAFORM_VERSION: ${TERRAFORM_VERSION:-1.8.5}
+    working_dir: /workspace/${TF_ENV:-envs/vcenter}
+    entrypoint: ["terraform"]
+    command: ["version"]
+    env_file:
+      - path: .env.terraform
+        required: false
+    volumes:
+      - .:/workspace
+      - ./providers:/workspace/providers
+      - ./.docker-cache/terraform:/root/.terraform.d

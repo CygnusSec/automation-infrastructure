@@ -1,0 +1,57 @@
+#cloud-config
+hostname: ${hostname}
+manage_etc_hosts: true
+users:
+  - default
+  - name: ${default_user}
+    groups:
+      - sudo
+    shell: /bin/bash
+    sudo: ALL=(ALL) ALL
+%{ if default_user_password != "" ~}
+    lock_passwd: false
+%{ endif ~}
+    ssh_authorized_keys:
+%{ for key in ssh_authorized_keys ~}
+      - ${key}
+%{ endfor ~}
+ssh_pwauth: false
+%{ if default_user_password != "" ~}
+chpasswd:
+  expire: false
+  users:
+    - name: ${default_user}
+      password: ${jsonencode(default_user_password)}
+      type: text
+%{ endif ~}
+write_files:
+  - path: /etc/sudoers.d/99-${default_user}-cloud-init
+    permissions: "0440"
+    content: |
+      ${default_user} ALL=(ALL) ALL
+package_update: false
+package_upgrade: false
+package_reboot_if_required: false
+runcmd:
+  - rm -f /etc/sudoers.d/90-cloud-init-users
+  - visudo -cf /etc/sudoers.d/99-${default_user}-cloud-init || rm -f /etc/sudoers.d/99-${default_user}-cloud-init
+  - |
+    # Remove template's old netplan config so cloud-init network takes effect
+    find /etc/netplan -name '*.yaml' -not -name '50-cloud-init.yaml' -delete
+    netplan apply
+%{ for i, disk in data_disks ~}
+  - |
+    DISK="/dev/sd${chr(98 + i)}"
+    if [ ! -b "$${DISK}1" ]; then
+      parted -s $${DISK} mklabel gpt
+      parted -s $${DISK} mkpart primary ext4 0% 100%
+      sleep 2
+      mkfs.ext4 -F $${DISK}1
+    fi
+    mkdir -p ${disk.mount_path}
+    if ! grep -q "$${DISK}1" /etc/fstab; then
+      echo "$${DISK}1 ${disk.mount_path} ext4 defaults,nofail 0 2" >> /etc/fstab
+    fi
+    mount -a
+%{ endfor ~}
+${extra_cloud_init_userdata}

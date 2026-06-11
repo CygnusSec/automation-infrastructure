@@ -1,0 +1,9 @@
+cluster = null
+
+# Host-to-datastore mapping: define once, then VMs automatically use the datastore for their host.
+host_datastore_map = {
+  "x.x.x.15" = "datastore1 (5)"
+  "x.x.x.16" = "datastore1 (4)"
+  "x.x.x.17" = "datastore1 (3)"
+  "x.x.x.18" = "datastore1 (2)"
+}

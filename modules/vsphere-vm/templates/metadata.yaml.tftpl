@@ -1,0 +1,21 @@
+instance-id: ${instance_id}
+local-hostname: ${hostname}
+network:
+  version: 2
+  ethernets:
+    nic0:
+      match:
+        name: e*
+%{ if use_dhcp ~}
+      dhcp4: true
+%{ else ~}
+      dhcp4: false
+      addresses:
+        - ${ipv4_address}/${ipv4_prefix_length}
+      gateway4: ${ipv4_gateway}
+      nameservers:
+        addresses:
+%{ for dns in dns_servers ~}
+          - ${dns}
+%{ endfor ~}
+%{ endif ~}

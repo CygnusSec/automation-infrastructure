@@ -1,0 +1,41 @@
+# Terraform local working directories
+**/.terraform/
+.terraformrc.offline
+
+# Terraform state and plans
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+tfplan.*
+plan.out
+
+# Terraform crash logs and local overrides
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Local Terraform variable files
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+!*.tfvars.json.example
+
+# Docker/runtime artifacts
+.docker-cache/
+offline-dist/
+providers/
+
+# Local environment files
+.env
+.env.compose
+.env.terraform
+.env.local
+
+# Local assistant/editor metadata
+.kiro
+.codex
+.agents
