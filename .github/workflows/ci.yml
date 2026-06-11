@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TERRAFORM_VERSION: "1.8.5"
+  TF_ENV: envs/vcenter
+
+jobs:
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive
+
+      - name: Initialize Terraform
+        working-directory: ${{ env.TF_ENV }}
+        run: terraform init -backend=false -lockfile=readonly
+
+      - name: Validate Terraform
+        working-directory: ${{ env.TF_ENV }}
+        run: terraform validate
+
+  scripts:
+    name: Scripts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check shell syntax
+        run: |
+          bash -n scripts/run-terraform.sh
+          bash -n scripts/build-docker-offline-bundle.sh
+
+  docker:
+    name: Docker
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Render Docker Compose config
+        run: docker compose --env-file .env.compose.example -f docker-compose.yml config
+
+      - name: Build Terraform runtime image
+        run: docker build --build-arg TERRAFORM_VERSION="${TERRAFORM_VERSION}" -f docker/Dockerfile .

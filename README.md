@@ -256,6 +256,18 @@ Useful state commands:
 ./scripts/run-terraform.sh envs/vcenter state show 'module.vsphere_vm["test-vcenter-01"].vsphere_virtual_machine.this'
 ```
 
+## CI
+
+GitHub Actions runs on pushes to `main` or `master`, pull requests, and manual dispatch.
+
+The CI workflow checks:
+
+- Terraform formatting with `terraform fmt -check -recursive`
+- Terraform initialization and validation for `envs/vcenter`
+- Shell syntax for scripts in `scripts/`
+- Docker Compose config rendering
+- Terraform runtime Docker image build
+
 ## Expected Result
 
 After a successful `apply`:
