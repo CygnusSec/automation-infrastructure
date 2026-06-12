@@ -99,9 +99,9 @@ Edit the vCenter connection, template, network, datastore, and VM definitions.
 Then run Terraform through the wrapper:
 
 ```bash
-./scripts/run-terraform.sh init
-./scripts/run-terraform.sh plan
-./scripts/run-terraform.sh apply
+./scripts/run-terraform.sh envs/vcenter validate
+./scripts/run-terraform.sh envs/vcenter plan
+./scripts/run-terraform.sh envs/vcenter apply
 ```
 
 See `Terraform/README.md` for all VM fields and offline bundle instructions.
@@ -160,20 +160,20 @@ auth.yaml    optional sudo password
 Validate and run:
 
 ```bash
-./scripts/run-ansible.sh deploy.yaml --syntax-check
-./scripts/run-ansible.sh predeploy-show-info.yaml
-./scripts/run-ansible.sh deploy.yaml
+./scripts/run-ansible.sh deploy --syntax-check
+./scripts/run-ansible.sh predeploy-show-info
+./scripts/run-ansible.sh deploy
 ```
 
 Run individual areas when needed:
 
 ```bash
-./scripts/run-ansible.sh deploy.yaml --tags prerequisite
-./scripts/run-ansible.sh deploy.yaml --tags docker
-./scripts/run-ansible.sh deploy.yaml --tags zabbix
-./scripts/run-ansible.sh deploy.yaml --tags docker_swarm
-./scripts/run-ansible.sh deploy.yaml --tags hostname --limit <host>
-./scripts/run-ansible.sh deploy.yaml --tags network --limit <host>
+./scripts/run-ansible.sh deploy --tags prerequisite
+./scripts/run-ansible.sh deploy --tags docker
+./scripts/run-ansible.sh deploy --tags zabbix
+./scripts/run-ansible.sh deploy --tags docker_swarm
+./scripts/run-ansible.sh deploy --tags hostname --limit <host>
+./scripts/run-ansible.sh deploy --tags network --limit <host>
 ```
 
 See `Ansible/README.md` for all variables, online/offline modes, and role
@@ -192,11 +192,11 @@ Typical online flow:
 
 ```bash
 cd Terraform
-./scripts/run-terraform.sh init
-./scripts/run-terraform.sh apply
+./scripts/run-terraform.sh envs/vcenter plan
+./scripts/run-terraform.sh envs/vcenter apply
 
 cd ../Ansible
-./scripts/run-ansible.sh deploy.yaml
+./scripts/run-ansible.sh deploy
 ```
 
 ## Offline Mode

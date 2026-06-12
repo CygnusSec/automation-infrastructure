@@ -155,14 +155,40 @@ variable "enable_customization" {
 }
 
 variable "data_disks" {
-  description = "Additional data disks to attach to the VM. Each disk specifies size, mount point, and optional thin provisioning."
+  description = "Additional data disks to attach to the VM. Each disk specifies size, mount point, optional Linux device path, and optional thin provisioning."
   type = list(object({
     size_gb          = number
     mount_path       = string
     label            = optional(string)
+    device           = optional(string)
     thin_provisioned = optional(bool, true)
   }))
   default = []
+
+  validation {
+    condition     = alltrue([for disk in var.data_disks : disk.size_gb > 0])
+    error_message = "All data_disks entries must have size_gb greater than 0."
+  }
+
+  validation {
+    condition     = alltrue([for disk in var.data_disks : startswith(disk.mount_path, "/")])
+    error_message = "All data_disks entries must use an absolute mount_path."
+  }
+
+  validation {
+    condition     = alltrue([for disk in var.data_disks : disk.device == null || startswith(disk.device, "/dev/")])
+    error_message = "When set, data_disks.device must be an absolute path under /dev/."
+  }
+
+  validation {
+    condition     = length(distinct([for disk in var.data_disks : disk.mount_path])) == length(var.data_disks)
+    error_message = "data_disks mount_path values must be unique."
+  }
+
+  validation {
+    condition     = length(distinct([for disk in var.data_disks : disk.device if disk.device != null])) == length([for disk in var.data_disks : disk.device if disk.device != null])
+    error_message = "Explicit data_disks device values must be unique."
+  }
 }
 
 variable "extra_network_interfaces" {

@@ -317,10 +317,15 @@ data_disks = [
     size_gb          = 100
     mount_path       = "/data"
     label            = "data"
+    device           = "/dev/sdb"
     thin_provisioned = true
   }
 ]
 ```
+
+`device` is optional. When it is omitted, the module assumes `/dev/sdb` for the
+first data disk, `/dev/sdc` for the second, and so on. Set it explicitly when
+the guest OS exposes disks with stable names such as `/dev/disk/by-id/...`.
 
 ## Terraform Workflow
 
@@ -342,6 +347,17 @@ The wrapper:
 - Runs the requested Terraform command.
 
 Docker Compose passes `.env.terraform` into the Terraform container when that file exists.
+
+Run formatting through the same Docker runtime when the host does not have a
+local Terraform binary:
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" \
+  -v "$PWD:/workspace" \
+  -w /workspace \
+  terraform-vmware-vcenter-runtime:1.8.5 \
+  fmt -recursive
+```
 
 Useful state commands:
 
