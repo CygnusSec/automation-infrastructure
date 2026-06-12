@@ -1,0 +1,74 @@
+---
+- name: Validate network role inputs
+  ansible.builtin.assert:
+    that:
+      - network_manage | bool
+      - network_interface | length > 0
+      - network_ipv4_address | length > 0
+      - network_ipv4_prefix_length | int > 0
+    fail_msg: "Set network_manage=true and provide interface, IPv4 address and prefix length before running the network role."
+
+- name: Check for cloud-init Netplan file
+  ansible.builtin.stat:
+    path: /etc/netplan/50-cloud-init.yaml
+  register: network_cloud_init_netplan
+
+- name: Back up cloud-init Netplan file
+  ansible.builtin.copy:
+    src: /etc/netplan/50-cloud-init.yaml
+    remote_src: true
+    dest: /etc/netplan/50-cloud-init.yaml.ansible.bak
+    owner: root
+    group: root
+    mode: "0600"
+  when: network_cloud_init_netplan.stat.exists
+
+- name: Disable cloud-init Netplan file
+  ansible.builtin.file:
+    path: /etc/netplan/50-cloud-init.yaml
+    state: absent
+  when: network_cloud_init_netplan.stat.exists
+
+- name: Render netplan configuration
+  ansible.builtin.copy:
+    dest: /etc/netplan/99-ansible-static.yaml
+    owner: root
+    group: root
+    mode: "0600"
+    content: |
+      network:
+        version: 2
+        ethernets:
+          {{ network_interface }}:
+            dhcp4: false
+            addresses:
+              - {{ network_ipv4_address }}/{{ network_ipv4_prefix_length }}
+      {% if network_ipv4_gateway | length > 0 %}
+            routes:
+              - to: default
+                via: {{ network_ipv4_gateway }}
+      {% endif %}
+      {% if network_dns_servers | length > 0 %}
+            nameservers:
+              addresses:
+      {% for server in network_dns_servers %}
+                - {{ server }}
+      {% endfor %}
+      {% endif %}
+
+- name: Trigger netplan apply in background
+  ansible.builtin.shell: |
+    nohup sh -c "sleep 2 && netplan apply" >/tmp/ansible-netplan-apply.log 2>&1 &
+  args:
+    executable: /bin/bash
+  changed_when: true
+
+- name: Wait for SSH on new IP
+  ansible.builtin.wait_for:
+    host: "{{ network_ipv4_address }}"
+    port: 22
+    delay: 3
+    timeout: 60
+    state: started
+  delegate_to: localhost
+  become: false

@@ -1,0 +1,60 @@
+---
+- name: Prepare base Ubuntu hosts
+  hosts: linux
+  gather_facts: false
+  become: true
+  pre_tasks:
+    - name: Gather facts
+      ansible.builtin.setup:
+      tags:
+        - always
+  roles:
+    - prerequisite
+    - docker
+  tags:
+    - base
+
+- name: Manage hostnames
+  hosts: linux
+  gather_facts: false
+  become: true
+  pre_tasks:
+    - name: Gather facts
+      ansible.builtin.setup:
+      tags:
+        - always
+  roles:
+    - role: hostname
+      when: hostname_manage | bool
+  tags:
+    - hostname
+
+- name: Manage static network settings
+  hosts: linux
+  gather_facts: false
+  become: true
+  pre_tasks:
+    - name: Gather facts
+      ansible.builtin.setup:
+      tags:
+        - always
+  roles:
+    - role: network
+      when: network_manage | bool
+  tags:
+    - network
+
+- name: Configure Docker Swarm
+  hosts: "{{ docker_swarm_target_group | default('swarm_managers:swarm_workers') }}"
+  gather_facts: false
+  become: true
+  pre_tasks:
+    - name: Gather facts
+      ansible.builtin.setup:
+      tags:
+        - always
+  roles:
+    - role: docker_swarm
+      when: docker_swarm_enabled | bool
+  tags:
+    - docker_swarm

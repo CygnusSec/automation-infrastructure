@@ -1,0 +1,218 @@
+---
+- name: Validate Docker Swarm inventory layout
+  ansible.builtin.assert:
+    that:
+      - groups[docker_swarm_manager_group] is defined
+      - groups[docker_swarm_manager_group] | length > 0
+    fail_msg: "Define at least one host in the manager group before running the docker_swarm role."
+  run_once: true
+  tags:
+    - docker_swarm
+
+- name: Resolve primary Swarm manager
+  ansible.builtin.set_fact:
+    docker_swarm_primary_manager: "{{ groups[docker_swarm_manager_group] | first }}"
+  run_once: true
+  delegate_to: localhost
+  delegate_facts: true
+  tags:
+    - docker_swarm
+
+- name: Resolve primary Swarm manager address
+  ansible.builtin.set_fact:
+    docker_swarm_primary_manager_addr: >-
+      {{
+        docker_swarm_manager_addr
+        if docker_swarm_manager_addr | length > 0
+        else hostvars[hostvars['localhost'].docker_swarm_primary_manager].docker_swarm_advertise_addr
+          | default(hostvars[hostvars['localhost'].docker_swarm_primary_manager].ansible_host
+          | default(hostvars['localhost'].docker_swarm_primary_manager))
+      }}
+  run_once: true
+  delegate_to: localhost
+  delegate_facts: true
+  tags:
+    - docker_swarm
+
+- name: Configure Docker Swarm iptables rules
+  ansible.builtin.include_tasks: iptables.yml
+  when: docker_swarm_manage_iptables | bool
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+
+- name: Check Docker Swarm state
+  ansible.builtin.command: docker info --format '{{ "{{" }} .Swarm.LocalNodeState {{ "}}" }}'
+  register: docker_swarm_state
+  changed_when: false
+  failed_when: false
+  tags:
+    - docker_swarm
+
+- name: Reset swarm state when requested
+  ansible.builtin.command: docker swarm leave --force
+  register: docker_swarm_leave_result
+  changed_when: docker_swarm_leave_result.rc == 0
+  failed_when: false
+  when: docker_swarm_force_reset | bool
+  tags:
+    - docker_swarm
+    - docker_swarm_reset
+
+- name: Refresh Docker Swarm state after reset
+  ansible.builtin.command: docker info --format '{{ "{{" }} .Swarm.LocalNodeState {{ "}}" }}'
+  register: docker_swarm_state
+  changed_when: false
+  failed_when: false
+  when: docker_swarm_force_reset | bool
+  tags:
+    - docker_swarm
+    - docker_swarm_reset
+
+- name: Initialize primary Swarm manager
+  ansible.builtin.command: >
+    docker swarm init
+    --advertise-addr {{ docker_swarm_advertise_addr | default(ansible_host | default(inventory_hostname)) }}
+    --listen-addr {{ docker_swarm_listen_addr }}
+  register: docker_swarm_init_result
+  changed_when: "'Swarm initialized' in docker_swarm_init_result.stdout"
+  failed_when:
+    - docker_swarm_init_result.rc != 0
+    - "'This node is already part of a swarm' not in docker_swarm_init_result.stderr"
+    - "'This node is already part of a swarm' not in docker_swarm_init_result.stdout"
+  when:
+    - inventory_hostname == hostvars['localhost'].docker_swarm_primary_manager
+    - docker_swarm_state.stdout != "active"
+  tags:
+    - docker_swarm
+
+- name: Get worker join token
+  ansible.builtin.command: docker swarm join-token -q worker
+  register: docker_swarm_worker_token
+  changed_when: false
+  when: inventory_hostname == hostvars['localhost'].docker_swarm_primary_manager
+  tags:
+    - docker_swarm
+
+- name: Get manager join token
+  ansible.builtin.command: docker swarm join-token -q manager
+  register: docker_swarm_manager_token
+  changed_when: false
+  when: inventory_hostname == hostvars['localhost'].docker_swarm_primary_manager
+  tags:
+    - docker_swarm
+
+- name: Publish worker token to localhost facts
+  ansible.builtin.set_fact:
+    docker_swarm_worker_join_token: "{{ docker_swarm_worker_token.stdout }}"
+  when: inventory_hostname == hostvars['localhost'].docker_swarm_primary_manager
+  delegate_to: localhost
+  delegate_facts: true
+  tags:
+    - docker_swarm
+
+- name: Publish manager token to localhost facts
+  ansible.builtin.set_fact:
+    docker_swarm_manager_join_token: "{{ docker_swarm_manager_token.stdout }}"
+  when: inventory_hostname == hostvars['localhost'].docker_swarm_primary_manager
+  delegate_to: localhost
+  delegate_facts: true
+  tags:
+    - docker_swarm
+
+- name: Join additional managers to swarm
+  ansible.builtin.command: >
+    docker swarm join
+    --token {{ hostvars['localhost'].docker_swarm_manager_join_token }}
+    {{ hostvars['localhost'].docker_swarm_primary_manager_addr }}:{{ docker_swarm_port }}
+  register: docker_swarm_join_manager_result
+  changed_when: "'This node joined a swarm as a manager' in docker_swarm_join_manager_result.stdout"
+  failed_when:
+    - docker_swarm_join_manager_result.rc != 0
+    - "'This node is already part of a swarm' not in docker_swarm_join_manager_result.stderr"
+    - "'This node is already part of a swarm' not in docker_swarm_join_manager_result.stdout"
+  when:
+    - inventory_hostname in groups[docker_swarm_manager_group]
+    - inventory_hostname != hostvars['localhost'].docker_swarm_primary_manager
+    - docker_swarm_state.stdout != "active"
+  tags:
+    - docker_swarm
+
+- name: Join workers to swarm
+  ansible.builtin.command: >
+    docker swarm join
+    --token {{ hostvars['localhost'].docker_swarm_worker_join_token }}
+    {{ hostvars['localhost'].docker_swarm_primary_manager_addr }}:{{ docker_swarm_port }}
+  register: docker_swarm_join_worker_result
+  changed_when: "'This node joined a swarm as a worker' in docker_swarm_join_worker_result.stdout"
+  failed_when:
+    - docker_swarm_join_worker_result.rc != 0
+    - "'This node is already part of a swarm' not in docker_swarm_join_worker_result.stderr"
+    - "'This node is already part of a swarm' not in docker_swarm_join_worker_result.stdout"
+  when:
+    - groups[docker_swarm_worker_group] is defined
+    - inventory_hostname in groups[docker_swarm_worker_group]
+    - docker_swarm_state.stdout != "active"
+  tags:
+    - docker_swarm
+
+- name: Build Docker Swarm labels from inventory groups
+  ansible.builtin.set_fact:
+    docker_swarm_resolved_group_labels: "{{ docker_swarm_resolved_group_labels | default({}) | combine(item.value) }}"
+  loop: "{{ docker_swarm_group_labels | dict2items }}"
+  when: item.key in group_names
+  tags:
+    - docker_swarm
+    - docker_swarm_labels
+
+- name: Build Docker Swarm labels for this node
+  ansible.builtin.set_fact:
+    docker_swarm_resolved_node_labels: "{{ docker_swarm_resolved_group_labels | default({}) | combine(docker_swarm_node_labels) }}"
+  tags:
+    - docker_swarm
+    - docker_swarm_labels
+
+- name: Resolve Docker Swarm node name
+  ansible.builtin.command: docker info --format '{{ "{{" }} .Name {{ "}}" }}'
+  register: docker_swarm_node_name_result
+  changed_when: false
+  when: docker_swarm_resolved_node_labels | length > 0
+  tags:
+    - docker_swarm
+    - docker_swarm_labels
+
+- name: Inspect current Docker Swarm node labels
+  ansible.builtin.command:
+    argv:
+      - docker
+      - node
+      - inspect
+      - "{{ docker_swarm_node_name_result.stdout }}"
+      - "--format"
+      - '{{ "{{" }} json .Spec.Labels {{ "}}" }}'
+  register: docker_swarm_node_label_inspect
+  changed_when: false
+  delegate_to: "{{ hostvars['localhost'].docker_swarm_primary_manager }}"
+  when: docker_swarm_resolved_node_labels | length > 0
+  tags:
+    - docker_swarm
+    - docker_swarm_labels
+
+- name: Apply Docker Swarm node labels
+  ansible.builtin.command:
+    argv:
+      - docker
+      - node
+      - update
+      - "--label-add"
+      - "{{ item.key }}={{ item.value }}"
+      - "{{ docker_swarm_node_name_result.stdout }}"
+  loop: "{{ docker_swarm_resolved_node_labels | dict2items }}"
+  changed_when: true
+  delegate_to: "{{ hostvars['localhost'].docker_swarm_primary_manager }}"
+  when:
+    - docker_swarm_resolved_node_labels | length > 0
+    - (((docker_swarm_node_label_inspect.stdout | default('{}') | from_json) or {}).get(item.key, '')) != (item.value | string)
+  tags:
+    - docker_swarm
+    - docker_swarm_labels

@@ -1,0 +1,94 @@
+---
+# Customer/environment variables.
+# Keep secrets out of git; store per-customer secrets in
+# inventories/customer-a/secrets/.
+
+target_os_family: "{{ lookup('env', 'ANSIBLE_TARGET_OS_FAMILY') | default('Debian', true) }}"
+target_distribution: "{{ lookup('env', 'ANSIBLE_TARGET_DISTRIBUTION') | default('Ubuntu', true) }}"
+
+prerequisite_packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg
+  - lsb-release
+  - net-tools
+  - openssh-client
+  - python3
+  - python3-apt
+  - python3-pip
+  - rsync
+  - sshpass
+  - telnet
+  - traceroute
+  - unzip
+  - vim
+  - wget
+
+prerequisite_sysctl:
+  net.ipv4.ip_local_port_range: "1024 65535"
+  fs.file-max: "5000000"
+
+prerequisite_limits:
+  - "* soft nproc 65535"
+  - "* hard nproc 65535"
+  - "* soft nofile 65535"
+  - "* hard nofile 65535"
+
+prerequisite_disable_swap: "{{ (lookup('env', 'ANSIBLE_PREREQUISITE_DISABLE_SWAP') | default('true', true)) | bool }}"
+prerequisite_disable_ufw: "{{ (lookup('env', 'ANSIBLE_PREREQUISITE_DISABLE_UFW') | default('false', true)) | bool }}"
+prerequisite_timezone: "{{ lookup('env', 'ANSIBLE_PREREQUISITE_TIMEZONE') | default('', true) }}"
+
+# Target hosts run Ubuntu 24.04. Offline .deb files must be downloaded for
+# Ubuntu 24.04 (noble) and the target architecture, usually amd64.
+prerequisite_install_from_local_repo: "{{ (lookup('env', 'ANSIBLE_PREREQUISITE_INSTALL_FROM_LOCAL_REPO') | default('true', true)) | bool }}"
+prerequisite_repo_source: "{{ lookup('env', 'ANSIBLE_PREREQUISITE_REPO_SOURCE') | default('./repo/prerequisite', true) }}"
+prerequisite_repo_dest: "{{ lookup('env', 'ANSIBLE_PREREQUISITE_REPO_DEST') | default('/media/installation/prerequisite', true) }}"
+
+docker_install_from_local_repo: "{{ (lookup('env', 'ANSIBLE_DOCKER_INSTALL_FROM_LOCAL_REPO') | default('true', true)) | bool }}"
+docker_repo_source: "{{ lookup('env', 'ANSIBLE_DOCKER_REPO_SOURCE') | default('./repo/docker', true) }}"
+docker_repo_dest: "{{ lookup('env', 'ANSIBLE_DOCKER_REPO_DEST') | default('/media/installation/docker', true) }}"
+docker_packages:
+  - docker.io
+  - docker-compose-v2
+docker_users:
+  - "{{ ansible_user }}"
+
+# Hostname role
+hostname_manage: "{{ (lookup('env', 'ANSIBLE_HOSTNAME_MANAGE') | default('true', true)) | bool }}"
+hostname_value: "{{ lookup('env', 'ANSIBLE_HOSTNAME_VALUE') | default('ubuntu-proxmox-01-vm', true) }}"
+hostname_domain: "{{ lookup('env', 'ANSIBLE_HOSTNAME_DOMAIN') | default('', true) }}"
+
+# Network role
+network_manage: "{{ (lookup('env', 'ANSIBLE_NETWORK_MANAGE') | default('true', true)) | bool }}"
+network_interface: "{{ lookup('env', 'ANSIBLE_NETWORK_INTERFACE') | default('ens34', true) }}"
+network_ipv4_address: "{{ lookup('env', 'ANSIBLE_NETWORK_IPV4_ADDRESS') | default('192.168.1.151', true) }}"
+network_ipv4_prefix_length: "{{ (lookup('env', 'ANSIBLE_NETWORK_IPV4_PREFIX_LENGTH') | default('24', true)) | int }}"
+network_ipv4_gateway: "{{ lookup('env', 'ANSIBLE_NETWORK_IPV4_GATEWAY') | default('192.168.1.1', true) }}"
+network_dns_servers: "{{ lookup('env', 'ANSIBLE_NETWORK_DNS_SERVERS') | default('[192.168.1.1, 8.8.8.8]', true) | from_yaml }}"
+
+# Docker Swarm role
+docker_swarm_enabled: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_ENABLED') | default('true', true)) | bool }}"
+docker_swarm_manager_group: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_MANAGER_GROUP') | default('swarm_managers', true) }}"
+docker_swarm_worker_group: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_WORKER_GROUP') | default('swarm_workers', true) }}"
+docker_swarm_listen_addr: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_LISTEN_ADDR') | default('0.0.0.0:2377', true) }}"
+docker_swarm_port: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_PORT') | default('2377', true)) | int }}"
+docker_swarm_force_reset: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_FORCE_RESET') | default('false', true)) | bool }}"
+docker_swarm_manager_addr: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_MANAGER_ADDR') | default('', true) }}"
+docker_swarm_manage_iptables: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_MANAGE_IPTABLES') | default('true', true)) | bool }}"
+docker_swarm_iptables_source_cidr: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_IPTABLES_SOURCE_CIDR') | default('0.0.0.0/0', true) }}"
+docker_swarm_manage_encrypted_overlay_esp: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_MANAGE_ENCRYPTED_OVERLAY_ESP') | default('false', true)) | bool }}"
+# Add published application ports here when needed.
+# Example:
+# docker_swarm_service_ports:
+#   - port: 80
+#     protocol: tcp
+#   - port: 443
+#     protocol: tcp
+docker_swarm_service_ports: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_SERVICE_PORTS') | default('[]', true) | from_yaml }}"
+
+# Label nodes automatically after they join the Swarm.
+# Group labels apply to any inventory group listed here. Host-level
+# docker_swarm_node_labels can override these values.
+docker_swarm_group_labels: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_GROUP_LABELS') | default('{swarm_app_workers: {workload: app, disk: ssd}, swarm_data_workers: {workload: data, disk: hdd}}', true) | from_yaml }}"
+docker_swarm_node_labels: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_NODE_LABELS') | default('{}', true) | from_yaml }}"

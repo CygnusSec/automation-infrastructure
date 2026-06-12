@@ -1,0 +1,18 @@
+services:
+  ansible:
+    container_name: ansible-c
+    hostname: ansible-c
+    image: ${RUNTIME_IMAGE:-${LOCAL_RUNTIME_IMAGE:-ansible-base-runtime:local}}
+    env_file:
+      - .env
+    build:
+      context: .
+      dockerfile: build/dockerfile
+    restart: unless-stopped
+    command:
+      - sleep
+      - infinity
+    volumes:
+      - ./:/playbook
+    working_dir: /playbook
+    network_mode: host

@@ -1,0 +1,18 @@
+---
+- name: Validate hostname role inputs
+  ansible.builtin.assert:
+    that:
+      - hostname_manage | bool
+      - hostname_value | length > 0
+    fail_msg: "Set hostname_manage=true and provide hostname_value before running the hostname role."
+
+- name: Set system hostname
+  ansible.builtin.hostname:
+    name: "{{ hostname_value }}"
+
+- name: Ensure hostname entry exists in /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1\s+'
+    line: "127.0.1.1 {{ hostname_value }}{% if hostname_domain | length > 0 %} {{ hostname_value }}.{{ hostname_domain }}{% endif %}"
+    state: present

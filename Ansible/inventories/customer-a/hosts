@@ -1,0 +1,44 @@
+---
+all:
+  children:
+    swarm_managers:
+      hosts:
+        manager-1:
+          ansible_host: "{{ lookup('env', 'ANSIBLE_MANAGER_1_HOST') | default('192.168.1.143', true) }}"
+          docker_swarm_advertise_addr: "{{ lookup('env', 'ANSIBLE_MANAGER_1_ADVERTISE_ADDR') | default(lookup('env', 'ANSIBLE_MANAGER_1_HOST') | default('192.168.1.143', true), true) }}"
+
+    swarm_app_workers:
+      hosts:
+        # app-worker-1:
+        #   ansible_host: "{{ lookup('env', 'ANSIBLE_APP_WORKER_1_HOST') | default('192.168.1.152', true) }}"
+        #   docker_swarm_advertise_addr: "{{ lookup('env', 'ANSIBLE_APP_WORKER_1_ADVERTISE_ADDR') | default(lookup('env', 'ANSIBLE_APP_WORKER_1_HOST') | default('192.168.1.152', true), true) }}"
+        # app-worker-2:
+        #   ansible_host: "{{ lookup('env', 'ANSIBLE_APP_WORKER_2_HOST') | default('192.168.1.153', true) }}"
+        #   docker_swarm_advertise_addr: "{{ lookup('env', 'ANSIBLE_APP_WORKER_2_ADVERTISE_ADDR') | default(lookup('env', 'ANSIBLE_APP_WORKER_2_HOST') | default('192.168.1.153', true), true) }}"
+        # app-worker-3:
+        #   ansible_host: "{{ lookup('env', 'ANSIBLE_APP_WORKER_3_HOST') | default('192.168.1.154', true) }}"
+        #   docker_swarm_advertise_addr: "{{ lookup('env', 'ANSIBLE_APP_WORKER_3_ADVERTISE_ADDR') | default(lookup('env', 'ANSIBLE_APP_WORKER_3_HOST') | default('192.168.1.154', true), true) }}"
+
+    swarm_data_workers:
+      hosts:
+        # data-worker-1:
+        #   ansible_host: "{{ lookup('env', 'ANSIBLE_DATA_WORKER_1_HOST') | default('192.168.1.155', true) }}"
+        #   docker_swarm_advertise_addr: "{{ lookup('env', 'ANSIBLE_DATA_WORKER_1_ADVERTISE_ADDR') | default(lookup('env', 'ANSIBLE_DATA_WORKER_1_HOST') | default('192.168.1.155', true), true) }}"
+        # data-worker-2:
+        #   ansible_host: "{{ lookup('env', 'ANSIBLE_DATA_WORKER_2_HOST') | default('192.168.1.156', true) }}"
+        #   docker_swarm_advertise_addr: "{{ lookup('env', 'ANSIBLE_DATA_WORKER_2_ADVERTISE_ADDR') | default(lookup('env', 'ANSIBLE_DATA_WORKER_2_HOST') | default('192.168.1.156', true), true) }}"
+
+    swarm_workers:
+      children:
+        swarm_app_workers:
+        swarm_data_workers:
+
+    linux:
+      children:
+        swarm_managers:
+        swarm_workers:
+      vars:
+        ansible_user: "{{ lookup('env', 'ANSIBLE_SSH_USER') | default('ubuntu', true) }}"
+        ansible_ssh_private_key_file: "{{ lookup('env', 'ANSIBLE_SSH_PRIVATE_KEY_FILE') | default('./inventories/customer-a/secrets/id_rsa', true) }}"
+        ansible_become: "{{ (lookup('env', 'ANSIBLE_BECOME') | default('true', true)) | bool }}"
+        ansible_become_method: "{{ lookup('env', 'ANSIBLE_BECOME_METHOD') | default('sudo', true) }}"

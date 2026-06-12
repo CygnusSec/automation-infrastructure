@@ -1,0 +1,30 @@
+---
+docker_swarm_enabled: false
+docker_swarm_manager_group: swarm_managers
+docker_swarm_worker_group: swarm_workers
+docker_swarm_target_group: "swarm_managers:swarm_workers"
+docker_swarm_listen_addr: "0.0.0.0:2377"
+docker_swarm_port: 2377
+docker_swarm_force_reset: false
+docker_swarm_manager_addr: ""
+
+docker_swarm_manage_iptables: true
+docker_swarm_iptables_source_cidr: "0.0.0.0/0"
+docker_swarm_iptables_comment_prefix: "ansible docker swarm"
+docker_swarm_manage_encrypted_overlay_esp: false
+docker_swarm_manager_ports:
+  - port: "{{ docker_swarm_port }}"
+    protocol: tcp
+docker_swarm_node_ports:
+  - port: 7946
+    protocol: tcp
+  - port: 7946
+    protocol: udp
+  - port: 4789
+    protocol: udp
+docker_swarm_encrypted_overlay_protocols:
+  - protocol: esp
+docker_swarm_service_ports: []
+
+docker_swarm_group_labels: {}
+docker_swarm_node_labels: {}

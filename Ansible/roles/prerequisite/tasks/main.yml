@@ -1,0 +1,130 @@
+---
+- name: Validate supported OS
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.os_family == target_os_family
+      - ansible_facts.distribution == target_distribution
+    fail_msg: "This base role supports Ubuntu only. Found {{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }}."
+  tags:
+    - prerequisite
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: not prerequisite_install_from_local_repo | bool
+  tags:
+    - prerequisite
+
+- name: Install prerequisite packages from apt repositories
+  ansible.builtin.apt:
+    name: "{{ prerequisite_packages }}"
+    state: present
+  when: not prerequisite_install_from_local_repo | bool
+  tags:
+    - prerequisite
+
+- name: Create prerequisite local repo directory
+  ansible.builtin.file:
+    path: "{{ prerequisite_repo_dest }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: prerequisite_install_from_local_repo | bool
+  tags:
+    - prerequisite
+
+- name: Copy prerequisite local deb repository
+  ansible.builtin.copy:
+    src: "{{ prerequisite_repo_source }}/"
+    dest: "{{ prerequisite_repo_dest }}/"
+    owner: root
+    group: root
+    mode: preserve
+  when: prerequisite_install_from_local_repo | bool
+  tags:
+    - prerequisite
+
+- name: Find prerequisite deb packages
+  ansible.builtin.find:
+    paths: "{{ prerequisite_repo_dest }}"
+    patterns: "*.deb"
+    file_type: file
+  register: prerequisite_local_debs
+  when: prerequisite_install_from_local_repo | bool
+  tags:
+    - prerequisite
+
+- name: Validate prerequisite local deb repository
+  ansible.builtin.assert:
+    that:
+      - prerequisite_local_debs.matched | int > 0
+    fail_msg: "No .deb files found in {{ prerequisite_repo_dest }}. Add Ubuntu 24.04 packages under {{ prerequisite_repo_source }} before running offline."
+  when: prerequisite_install_from_local_repo | bool
+  tags:
+    - prerequisite
+
+- name: Install prerequisite packages from local deb repository
+  ansible.builtin.shell: apt-get install -y "{{ prerequisite_repo_dest }}"/*.deb
+  args:
+    executable: /bin/bash
+  when: prerequisite_install_from_local_repo | bool
+  tags:
+    - prerequisite
+
+- name: Configure sysctl values
+  ansible.builtin.lineinfile:
+    path: /etc/sysctl.conf
+    regexp: "^{{ item.key | regex_escape }}\\s*="
+    line: "{{ item.key }} = {{ item.value }}"
+  loop: "{{ prerequisite_sysctl | dict2items }}"
+  notify: Reload sysctl
+  tags:
+    - prerequisite
+
+- name: Configure system limits
+  ansible.builtin.copy:
+    dest: /etc/security/limits.d/99-ansible-base.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      {% for limit in prerequisite_limits %}
+      {{ limit }}
+      {% endfor %}
+  tags:
+    - prerequisite
+
+- name: Disable swap for current session
+  ansible.builtin.command: swapoff -a
+  changed_when: false
+  when: prerequisite_disable_swap | bool
+  tags:
+    - prerequisite
+
+- name: Disable swap permanently
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^(\s*)([^#\n]+\s+)(\S+\s+)swap(\s+.*)$'
+    replace: '#\1\2\3swap\4'
+    backup: true
+  when: prerequisite_disable_swap | bool
+  tags:
+    - prerequisite
+
+- name: Set timezone
+  ansible.builtin.command: "timedatectl set-timezone {{ prerequisite_timezone }}"
+  changed_when: true
+  when: prerequisite_timezone | length > 0
+  tags:
+    - prerequisite
+
+- name: Disable UFW when requested
+  ansible.builtin.command: ufw disable
+  register: ufw_disable
+  changed_when: "'Firewall stopped' in ufw_disable.stdout or 'disabled' in ufw_disable.stdout"
+  failed_when: false
+  when: prerequisite_disable_ufw | bool
+  tags:
+    - prerequisite
