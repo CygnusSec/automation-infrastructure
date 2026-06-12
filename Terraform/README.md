@@ -32,6 +32,8 @@ vCenter needs:
 envs/vcenter/                  Terraform environment for vCenter
 envs/vcenter/variables.tf      Environment variable definitions
 envs/vcenter/*.example         Example variable files
+envs/vcenter/vms/              Separate VM group variable files
+envs/vcenter/states/           Separate local state files
 modules/vsphere-vm/            Reusable VM module
 scripts/run-terraform.sh       Docker wrapper for Terraform commands
 scripts/build-docker-offline-bundle.sh
@@ -56,7 +58,7 @@ Create the local files you need from the examples:
 cp .env.compose.example .env.compose
 cp .env.terraform.example .env.terraform
 cp envs/vcenter/terraform.auto.tfvars.example envs/vcenter/terraform.auto.tfvars
-cp envs/vcenter/vms.auto.tfvars.example envs/vcenter/vms.auto.tfvars
+cp envs/vcenter/vms/vms-tldh-17.tfvars.example envs/vcenter/vms/vms-tldh-17.tfvars
 ```
 
 Use `.env.compose` for Docker/runtime settings such as `TERRAFORM_IMAGE` and `TERRAFORM_VERSION`.
@@ -69,7 +71,7 @@ The main Terraform files you normally edit are:
 
 ```text
 envs/vcenter/terraform.auto.tfvars
-envs/vcenter/vms.auto.tfvars
+envs/vcenter/vms/*.tfvars
 ```
 
 ## Base vCenter Configuration
@@ -133,7 +135,8 @@ If the same variable is set in both `.env.terraform` and an `.auto.tfvars` file,
 
 ## VM Definitions
 
-VMs are managed through the `vms` map, usually in `envs/vcenter/vms.auto.tfvars`.
+VMs are managed through the `vms` map. Keep one vCenter environment in
+`envs/vcenter`, then split VM groups into files under `envs/vcenter/vms/`.
 
 Example:
 
@@ -193,6 +196,97 @@ Common per-VM fields:
 - `data_disks`
 
 Use `ipv4_address = "dhcp"` or leave `ipv4_address` empty to use DHCP for the primary interface.
+
+## Separate VM Groups And State
+
+There is only one vCenter environment: `envs/vcenter`. Split VM definitions by
+ESXi host, service group, or operational ownership with `-var-file`, and keep a
+separate local state file per group with `-state`.
+
+Example:
+
+```text
+envs/vcenter/
+  terraform.auto.tfvars
+  vms/
+    vms-vpn-15.tfvars
+    vms-tldh-17.tfvars
+    vms-tldh-18.tfvars
+    vms-data.tfvars
+  states/
+    terraform-vpn-15.tfstate
+    terraform-tldh-17.tfstate
+    terraform-tldh-18.tfstate
+    terraform-data.tfstate
+```
+
+Prepare a VM group file:
+
+```bash
+cp envs/vcenter/vms/vms-tldh-17.tfvars.example envs/vcenter/vms/vms-tldh-17.tfvars
+```
+
+Put only the ESXi `172.16.9.17` VMs in `envs/vcenter/vms/vms-tldh-17.tfvars`:
+
+```hcl
+vms = {
+  tldh-17-01 = {
+    hostname           = "tldh-17-01"
+    host               = "172.16.9.17"
+    network            = "APP-SERVER"
+    ipv4_address       = "x.x.x.121"
+    ipv4_prefix_length = 24
+    ipv4_gateway       = "x.x.x.1"
+    dns_servers        = ["x.x.x.10", "x.x.x.11"]
+  }
+}
+```
+
+Plan/apply one group:
+
+```bash
+./scripts/run-terraform.sh envs/vcenter plan -var-file=vms/vms-tldh-17.tfvars -state=states/terraform-tldh-17.tfstate
+./scripts/run-terraform.sh envs/vcenter apply -var-file=vms/vms-tldh-17.tfvars -state=states/terraform-tldh-17.tfstate
+```
+
+Examples by ESXi host:
+
+```bash
+# ESXi 172.16.9.17
+./scripts/run-terraform.sh envs/vcenter apply -var-file=vms/vms-tldh-17.tfvars -state=states/terraform-tldh-17.tfstate
+
+# ESXi 172.16.9.18
+./scripts/run-terraform.sh envs/vcenter apply -var-file=vms/vms-tldh-18.tfvars -state=states/terraform-tldh-18.tfstate
+
+# Data VMs with SAN data disks
+./scripts/run-terraform.sh envs/vcenter apply -var-file=vms/vms-data.tfvars -state=states/terraform-data.tfstate
+```
+
+Preview changes:
+
+```bash
+./scripts/run-terraform.sh envs/vcenter plan -var-file=vms/vms-vpn-15.tfvars -state=states/terraform-vpn-15.tfstate
+```
+
+Destroy only one group:
+
+```bash
+# Destroy only VPN on host .15
+./scripts/run-terraform.sh envs/vcenter destroy -var-file=vms/vms-vpn-15.tfvars -state=states/terraform-vpn-15.tfstate
+
+# Destroy only TLDH on host .17
+./scripts/run-terraform.sh envs/vcenter destroy -var-file=vms/vms-tldh-17.tfvars -state=states/terraform-tldh-17.tfstate
+```
+
+Useful state commands for one group:
+
+```bash
+./scripts/run-terraform.sh envs/vcenter state list -state=states/terraform-tldh-17.tfstate
+./scripts/run-terraform.sh envs/vcenter output -state=states/terraform-tldh-17.tfstate
+```
+
+Keep VM map keys unique across files unless you intentionally manage separate
+vCenter VM objects with separate state files.
 
 ### Additional Network Interfaces
 
