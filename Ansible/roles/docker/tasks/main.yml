@@ -1,0 +1,77 @@
+---
+- name: Install Docker dependencies
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+    state: present
+    update_cache: true
+  when: not docker_install_from_local_repo | bool
+  tags:
+    - docker
+
+- name: Create Docker local repo directory
+  ansible.builtin.file:
+    path: "{{ docker_repo_dest }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: docker_install_from_local_repo | bool
+  tags:
+    - docker
+
+- name: Copy Docker local deb repository
+  ansible.builtin.copy:
+    src: "{{ docker_repo_source }}/"
+    dest: "{{ docker_repo_dest }}/"
+    owner: root
+    group: root
+    mode: preserve
+  when: docker_install_from_local_repo | bool
+  tags:
+    - docker
+
+- name: Install Docker from local deb repository
+  ansible.builtin.shell: apt-get install -y "{{ docker_repo_dest }}"/*.deb
+  args:
+    executable: /bin/bash
+  when: docker_install_from_local_repo | bool
+  tags:
+    - docker
+
+- name: Install Docker from apt repositories
+  ansible.builtin.apt:
+    name: "{{ docker_packages }}"
+    state: present
+    update_cache: true
+  when: not docker_install_from_local_repo | bool
+  tags:
+    - docker
+
+- name: Ensure docker group exists
+  ansible.builtin.group:
+    name: docker
+    state: present
+  tags:
+    - docker
+
+- name: Add configured users to docker group
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: docker
+    append: true
+  loop: "{{ docker_users }}"
+  tags:
+    - docker
+
+- name: Enable and start Docker service
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: true
+    daemon_reload: true
+  tags:
+    - docker

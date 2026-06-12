@@ -29,6 +29,20 @@ override.tf.json
 offline-dist/
 providers/
 
+# Ansible local environment and artifacts
+Ansible/.env
+!Ansible/.env.example
+Ansible/dist/
+Ansible/*.retry
+Ansible/**/__pycache__/
+Ansible/**/*.pyc
+Ansible/repo/**/*.deb
+!Ansible/repo/README.md
+Ansible/inventories/*/secrets/*
+!Ansible/inventories/*/secrets/auth.yaml.example
+Ansible/README.md.bk
+Ansible/docs/Operations.md
+
 # Local environment files
 .env
 .env.compose

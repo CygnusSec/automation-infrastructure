@@ -1,0 +1,79 @@
+---
+- name: Build Docker Swarm iptables rule list
+  ansible.builtin.set_fact:
+    docker_swarm_iptables_rules: >-
+      {{
+        docker_swarm_node_ports
+        + docker_swarm_service_ports
+        + (docker_swarm_manager_ports if inventory_hostname in groups[docker_swarm_manager_group] else [])
+        + (docker_swarm_encrypted_overlay_protocols if docker_swarm_manage_encrypted_overlay_esp | bool else [])
+      }}
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+
+- name: Check Docker Swarm iptables port rules
+  ansible.builtin.command: >
+    iptables -C INPUT
+    -s {{ docker_swarm_iptables_source_cidr }}
+    -p {{ item.protocol }}
+    --dport {{ item.port | default(item.published) }}
+    -j ACCEPT
+  register: docker_swarm_iptables_check
+  changed_when: false
+  failed_when: false
+  loop: "{{ docker_swarm_iptables_rules }}"
+  when: item.port is defined or item.published is defined
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+
+- name: Allow Docker Swarm iptables port traffic
+  ansible.builtin.command: >
+    iptables -I INPUT
+    -s {{ docker_swarm_iptables_source_cidr }}
+    -p {{ item.item.protocol }}
+    --dport {{ item.item.port | default(item.item.published) }}
+    -j ACCEPT
+    -m comment --comment "{{ docker_swarm_iptables_comment_prefix }} {{ item.item.protocol }}/{{ item.item.port | default(item.item.published) }}"
+  changed_when: true
+  loop: "{{ docker_swarm_iptables_check.results }}"
+  when:
+    - item.skipped is not defined
+    - item.rc != 0
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+
+- name: Check Docker Swarm iptables protocol rules
+  ansible.builtin.command: >
+    iptables -C INPUT
+    -s {{ docker_swarm_iptables_source_cidr }}
+    -p {{ item.protocol }}
+    -j ACCEPT
+  register: docker_swarm_iptables_protocol_check
+  changed_when: false
+  failed_when: false
+  loop: "{{ docker_swarm_iptables_rules }}"
+  when:
+    - item.port is not defined
+    - item.published is not defined
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+
+- name: Allow Docker Swarm iptables protocol traffic
+  ansible.builtin.command: >
+    iptables -I INPUT
+    -s {{ docker_swarm_iptables_source_cidr }}
+    -p {{ item.item.protocol }}
+    -j ACCEPT
+    -m comment --comment "{{ docker_swarm_iptables_comment_prefix }} {{ item.item.protocol }}"
+  changed_when: true
+  loop: "{{ docker_swarm_iptables_protocol_check.results }}"
+  when:
+    - item.skipped is not defined
+    - item.rc != 0
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables

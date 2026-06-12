@@ -1,0 +1,21 @@
+---
+- name: Show host information before deployment
+  hosts: linux
+  gather_facts: true
+  tasks:
+    - name: Show OS release
+      ansible.builtin.debug:
+        msg: "{{ ansible_distribution }} {{ ansible_distribution_version }}"
+
+    - name: Show CPU and memory
+      ansible.builtin.debug:
+        msg: "cpu: {{ ansible_processor_vcpus }}, memory_mb: {{ ansible_memtotal_mb }}"
+
+    - name: Get disk information
+      ansible.builtin.command: lsblk
+      register: disk_info
+      changed_when: false
+
+    - name: Print disk information
+      ansible.builtin.debug:
+        var: disk_info.stdout_lines
