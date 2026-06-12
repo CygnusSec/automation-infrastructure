@@ -56,6 +56,16 @@ if [[ ! -d "${ROOT_DIR}/${ENV_PATH}" ]]; then
   exit 1
 fi
 
+for arg in "$@"; do
+  if [[ "${arg}" == -state=* ]]; then
+    state_path="${arg#-state=}"
+    state_dir="$(dirname "${state_path}")"
+    if [[ "${state_dir}" != "." ]]; then
+      mkdir -p "${ROOT_DIR}/${ENV_PATH}/${state_dir}"
+    fi
+  fi
+done
+
 mkdir -p "${ROOT_DIR}/.docker-cache/terraform"
 mkdir -p "${ROOT_DIR}/providers"
 

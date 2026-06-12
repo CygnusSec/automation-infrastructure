@@ -1,0 +1,20 @@
+vms = {
+  data-01 = {
+    hostname           = "data-01"
+    host               = "172.16.9.18"
+    network            = "DATA-SERVER"
+    ipv4_address       = "x.x.x.141"
+    ipv4_prefix_length = 24
+    ipv4_gateway       = "x.x.x.1"
+    dns_servers        = ["x.x.x.10", "x.x.x.11"]
+
+    data_disks = [
+      {
+        size_gb          = 100
+        mount_path       = "/data"
+        label            = "data"
+        thin_provisioned = true
+      }
+    ]
+  }
+}

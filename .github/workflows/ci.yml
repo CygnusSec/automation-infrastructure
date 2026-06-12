@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches:
+      - develop
       - main
       - master
   pull_request:
@@ -13,7 +14,7 @@ permissions:
 
 env:
   TERRAFORM_VERSION: "1.8.5"
-  TF_ENV: envs/vcenter
+  TF_ENV: Terraform/envs/vcenter
 
 jobs:
   terraform:
@@ -30,6 +31,7 @@ jobs:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
       - name: Check Terraform formatting
+        working-directory: Terraform
         run: terraform fmt -check -recursive
 
       - name: Initialize Terraform
@@ -39,6 +41,41 @@ jobs:
       - name: Validate Terraform
         working-directory: ${{ env.TF_ENV }}
         run: terraform validate
+
+      - name: Render Terraform Docker Compose config
+        working-directory: Terraform
+        run: docker compose --env-file .env.compose.example -f docker-compose.yml config
+
+      - name: Build Terraform runtime image
+        working-directory: Terraform
+        run: docker build --build-arg TERRAFORM_VERSION="${TERRAFORM_VERSION}" -f docker/Dockerfile .
+
+  ansible:
+    name: Ansible
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install ansible-core
+
+      - name: Check Ansible playbook syntax
+        working-directory: Ansible
+        run: |
+          ansible-playbook deploy.yaml --syntax-check
+          ansible-playbook predeploy-show-info.yaml --syntax-check
+
+      - name: Render Ansible Docker Compose config
+        working-directory: Ansible
+        run: docker compose --env-file .env.example -f docker-compose.yaml config
+
+      - name: Build Ansible runtime image
+        working-directory: Ansible
+        run: docker build -f build/dockerfile .
 
   scripts:
     name: Scripts
@@ -50,19 +87,8 @@ jobs:
 
       - name: Check shell syntax
         run: |
-          bash -n scripts/run-terraform.sh
-          bash -n scripts/build-docker-offline-bundle.sh
-
-  docker:
-    name: Docker
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Render Docker Compose config
-        run: docker compose --env-file .env.compose.example -f docker-compose.yml config
-
-      - name: Build Terraform runtime image
-        run: docker build --build-arg TERRAFORM_VERSION="${TERRAFORM_VERSION}" -f docker/Dockerfile .
+          bash -n Terraform/scripts/run-terraform.sh
+          bash -n Terraform/scripts/build-docker-offline-bundle.sh
+          bash -n Ansible/scripts/run-ansible.sh
+          bash -n Ansible/scripts/build-offline-bundle.sh
+          bash -n Ansible/scripts/prepare-offline-control.sh
