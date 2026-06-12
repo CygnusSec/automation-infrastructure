@@ -44,6 +44,22 @@
   tags:
     - network
 
+- name: Configure Zabbix agents
+  hosts: linux
+  gather_facts: false
+  become: true
+  pre_tasks:
+    - name: Gather facts
+      ansible.builtin.setup:
+      tags:
+        - always
+  roles:
+    - role: zabbix_agent
+      when: zabbix_agent_enabled | bool
+  tags:
+    - zabbix
+    - zabbix_agent
+
 - name: Configure Docker Swarm
   hosts: "{{ docker_swarm_target_group | default('swarm_managers:swarm_workers') }}"
   gather_facts: false

@@ -5,6 +5,7 @@ This repository prepares Ubuntu hosts and runs common operations tasks:
 - install baseline packages
 - configure sysctl, limits, and swap
 - install Docker and Docker Compose v2
+- configure Zabbix Agent
 - change hostnames
 - change static IP addresses
 - set up Docker Swarm
@@ -111,6 +112,7 @@ Main variable groups:
 
 - `prerequisite_*`
 - `docker_*`
+- `zabbix_agent_*`
 - `hostname_*`
 - `network_*`
 - `docker_swarm_*`
@@ -126,12 +128,15 @@ ANSIBLE_NETWORK_INTERFACE=ens34
 ANSIBLE_NETWORK_IPV4_ADDRESS=192.168.1.151
 ANSIBLE_NETWORK_IPV4_GATEWAY=192.168.1.1
 ANSIBLE_DOCKER_SWARM_ENABLED=true
+ANSIBLE_ZABBIX_AGENT_ENABLED=true
+ANSIBLE_ZABBIX_SERVER_HOST=192.168.1.10
 ```
 
 For offline runs, prepare:
 
 - `repo/prerequisite`
 - `repo/docker`
+- `repo/zabbix`
 
 ## Validation Runs
 
@@ -153,6 +158,88 @@ Check syntax by tag:
 ./scripts/run-ansible.sh deploy.yaml --syntax-check --tags network
 ```
 
+## Run Online
+
+Use this flow when the control machine can reach package registries or already
+has the Ansible runtime image locally.
+
+Prepare the control machine:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` for the target hosts, SSH key, hostname, network settings, and
+Swarm settings. Put the SSH private key and optional sudo password under:
+
+```text
+inventories/customer-a/secrets/
+```
+
+Then validate and run:
+
+```bash
+./scripts/run-ansible.sh deploy.yaml --syntax-check
+./scripts/run-ansible.sh predeploy-show-info.yaml
+./scripts/run-ansible.sh deploy.yaml
+```
+
+If `LOCAL_RUNTIME_IMAGE` is not available locally, `scripts/run-ansible.sh`
+builds it from `build/dockerfile`. If `RUNTIME_IMAGE` is set, it pulls that image
+from the registry.
+
+## Run Offline
+
+Use this flow when the control machine has no internet access. Prepare the
+offline bundle on another machine that does have network access.
+
+On the online build machine:
+
+```bash
+cp .env.example .env
+./scripts/build-offline-bundle.sh
+```
+
+This creates:
+
+```text
+dist/ansible-base-offline-<timestamp>/
+dist/ansible-base-offline-<timestamp>.tar.gz
+```
+
+Copy the `.tar.gz` file to the offline control machine and extract it. On the
+offline control machine:
+
+```bash
+cd project
+./scripts/prepare-offline-control.sh
+```
+
+The prepare script loads `../image-runtime/ansible-runtime.tar`, creates `.env`
+from `.env.example` when needed, sets `ANSIBLE_CONTROL_OFFLINE=true`, and pins
+`LOCAL_RUNTIME_IMAGE` to the packaged image name.
+
+Before running offline, make sure these items are already present:
+
+- Docker Engine and Docker Compose plugin on the control machine
+- SSH network access from the control machine to target hosts
+- target SSH key at the path configured by `ANSIBLE_SSH_PRIVATE_KEY_FILE`
+- optional sudo secret at `inventories/customer-a/secrets/auth.yaml`
+- local `.deb` packages under `repo/prerequisite` and `repo/docker` if target
+  hosts cannot install packages from apt repositories
+
+Then validate and run:
+
+```bash
+./scripts/run-ansible.sh deploy.yaml --syntax-check
+./scripts/run-ansible.sh predeploy-show-info.yaml
+./scripts/run-ansible.sh deploy.yaml
+```
+
+When `ANSIBLE_CONTROL_OFFLINE=true`, `scripts/run-ansible.sh` does not pull or
+build images. If the runtime image is missing locally, it fails and asks you to
+run `./scripts/prepare-offline-control.sh`.
+
 ## Run By Tag
 
 Run the full base play:
@@ -171,6 +258,12 @@ Run only Docker:
 
 ```bash
 ./scripts/run-ansible.sh deploy.yaml --tags docker
+```
+
+Configure Zabbix Agent:
+
+```bash
+./scripts/run-ansible.sh deploy.yaml --tags zabbix
 ```
 
 Change hostname:
@@ -292,6 +385,44 @@ docker_swarm_group_labels:
 Host-level `docker_swarm_node_labels` can add or override labels for a specific
 node.
 
+## Zabbix Agent
+
+The Ansible control machine is treated as the Zabbix server. Target hosts get a
+Zabbix Agent configuration that points back to that control machine.
+
+Set these values in `.env`:
+
+```env
+ANSIBLE_ZABBIX_AGENT_ENABLED=true
+ANSIBLE_ZABBIX_SERVER_HOST=192.168.1.10
+ANSIBLE_ZABBIX_AGENT_HOSTNAME=
+```
+
+`ANSIBLE_ZABBIX_SERVER_HOST` must be the IP address or DNS name of the control
+machine as seen from target hosts. `ANSIBLE_ZABBIX_AGENT_HOSTNAME` is optional;
+when it is empty, the role uses `inventory_hostname` so each target keeps a
+unique agent hostname.
+
+For offline target hosts, place Zabbix agent `.deb` packages under:
+
+```text
+repo/zabbix/
+```
+
+Then set:
+
+```env
+ANSIBLE_ZABBIX_AGENT_INSTALL_FROM_LOCAL_REPO=true
+ANSIBLE_ZABBIX_AGENT_REPO_SOURCE=./repo/zabbix
+ANSIBLE_ZABBIX_AGENT_REPO_DEST=/media/installation/zabbix
+```
+
+Run only Zabbix Agent configuration:
+
+```bash
+./scripts/run-ansible.sh deploy.yaml --tags zabbix
+```
+
 ## Verify After Running
 
 Check Docker:
@@ -318,14 +449,6 @@ RUNTIME_IMAGE=ansible-base-runtime:local LOCAL_RUNTIME_IMAGE=ansible-base-runtim
   ansible linux -m command -a 'systemctl is-active docker'
 ```
 
-## Build Bundle Offline
-
-```bash
-./scripts/build-offline-bundle.sh
-```
-
-The bundle will be created in `dist/`.
-
 ## Common Errors
 
 - SSH cannot connect to the host: check the inventory, firewall, user, and SSH key
@@ -333,3 +456,5 @@ The bundle will be created in `dist/`.
 - offline repo is empty: the role fails because it cannot find `.deb` files
 - IP address changed but inventory was not updated: later commands still point to the old IP address
 - Swarm run without `swarm_managers` or `swarm_workers` groups in inventory: the Swarm play is skipped or has no matching hosts
+- offline control image is missing: run `./scripts/prepare-offline-control.sh`
+  from the extracted bundle before running Ansible

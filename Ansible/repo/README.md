@@ -6,6 +6,7 @@ bundle.
 ```text
 repo/prerequisite/
 repo/docker/
+repo/zabbix/
 ```
 
 Keep package files matched to the target OS release and architecture.

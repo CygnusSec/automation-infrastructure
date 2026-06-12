@@ -54,6 +54,18 @@ docker_packages:
 docker_users:
   - "{{ ansible_user }}"
 
+# Zabbix agent role
+zabbix_agent_enabled: "{{ (lookup('env', 'ANSIBLE_ZABBIX_AGENT_ENABLED') | default('false', true)) | bool }}"
+zabbix_agent_install_from_local_repo: "{{ (lookup('env', 'ANSIBLE_ZABBIX_AGENT_INSTALL_FROM_LOCAL_REPO') | default('false', true)) | bool }}"
+zabbix_agent_repo_source: "{{ lookup('env', 'ANSIBLE_ZABBIX_AGENT_REPO_SOURCE') | default('./repo/zabbix', true) }}"
+zabbix_agent_repo_dest: "{{ lookup('env', 'ANSIBLE_ZABBIX_AGENT_REPO_DEST') | default('/media/installation/zabbix', true) }}"
+zabbix_agent_packages: "{{ lookup('env', 'ANSIBLE_ZABBIX_AGENT_PACKAGES') | default('[zabbix-agent]', true) | from_yaml }}"
+zabbix_agent_service_name: "{{ lookup('env', 'ANSIBLE_ZABBIX_AGENT_SERVICE_NAME') | default('zabbix-agent', true) }}"
+zabbix_agent_config_file: "{{ lookup('env', 'ANSIBLE_ZABBIX_AGENT_CONFIG_FILE') | default('/etc/zabbix/zabbix_agentd.conf', true) }}"
+zabbix_agent_server_host: "{{ lookup('env', 'ANSIBLE_ZABBIX_SERVER_HOST') | default('', true) }}"
+zabbix_agent_server_active: "{{ lookup('env', 'ANSIBLE_ZABBIX_SERVER_ACTIVE') | default(zabbix_agent_server_host, true) }}"
+zabbix_agent_hostname: "{{ lookup('env', 'ANSIBLE_ZABBIX_AGENT_HOSTNAME') | default(inventory_hostname, true) }}"
+
 # Hostname role
 hostname_manage: "{{ (lookup('env', 'ANSIBLE_HOSTNAME_MANAGE') | default('true', true)) | bool }}"
 hostname_value: "{{ lookup('env', 'ANSIBLE_HOSTNAME_VALUE') | default('ubuntu-proxmox-01-vm', true) }}"

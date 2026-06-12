@@ -75,6 +75,38 @@ touch "${PROJECT_DIR}/inventories/customer-a/secrets/.gitkeep"
 
 echo "${PACKAGE_IMAGE}" > "${IMAGE_DIR}/runtime-image.txt"
 
+cat > "${BUNDLE_DIR}/README-offline-control.md" <<EOF
+# Offline Ansible Control Machine
+
+This bundle is for a control machine without internet access.
+
+Prerequisites on the offline control machine:
+
+- Docker Engine
+- Docker Compose plugin
+- network access to the target hosts over SSH
+
+Prepare the control machine:
+
+\`\`\`bash
+cd project
+./scripts/prepare-offline-control.sh
+\`\`\`
+
+Edit \`project/.env\` for the target hosts and SSH settings, then run:
+
+\`\`\`bash
+./scripts/run-ansible.sh deploy.yaml --syntax-check
+./scripts/run-ansible.sh deploy.yaml
+\`\`\`
+
+The runtime image packaged in this bundle is:
+
+\`\`\`text
+${PACKAGE_IMAGE}
+\`\`\`
+EOF
+
 tar -C "${DIST_DIR}" -czf "${DIST_DIR}/${BUNDLE_NAME}.tar.gz" "${BUNDLE_NAME}"
 
 echo "Bundle directory: ${BUNDLE_DIR}"

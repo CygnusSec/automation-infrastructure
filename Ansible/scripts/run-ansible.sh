@@ -20,6 +20,7 @@ fi
 DEFAULT_ANSIBLE_IMAGE="ansible-base-runtime:local"
 LOCAL_RUNTIME_IMAGE="${LOCAL_RUNTIME_IMAGE:-${DEFAULT_ANSIBLE_IMAGE}}"
 RUNTIME_IMAGE="${RUNTIME_IMAGE:-}"
+ANSIBLE_CONTROL_OFFLINE="${ANSIBLE_CONTROL_OFFLINE:-false}"
 
 if [[ -n "${RUNTIME_IMAGE}" ]]; then
   ANSIBLE_IMAGE="${RUNTIME_IMAGE}"
@@ -57,6 +58,13 @@ if [[ -f "${INVENTORY_SECRET_VARS}" ]]; then
 fi
 
 if ! docker image inspect "${ANSIBLE_IMAGE}" >/dev/null 2>&1; then
+  if [[ "${ANSIBLE_CONTROL_OFFLINE}" == "true" ]]; then
+    echo "Ansible runtime image is not available locally: ${ANSIBLE_IMAGE}" >&2
+    echo "Control machine is offline, so the wrapper will not pull/build images." >&2
+    echo "Load the offline bundle image first: ./scripts/prepare-offline-control.sh" >&2
+    exit 1
+  fi
+
   if [[ "${USE_REGISTRY_IMAGE}" -eq 1 ]]; then
     docker pull "${ANSIBLE_IMAGE}"
   else
