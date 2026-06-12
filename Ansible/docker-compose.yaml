@@ -4,7 +4,8 @@ services:
     hostname: ansible-c
     image: ${RUNTIME_IMAGE:-${LOCAL_RUNTIME_IMAGE:-ansible-base-runtime:local}}
     env_file:
-      - .env
+      - path: .env
+        required: false
     build:
       context: .
       dockerfile: build/dockerfile
