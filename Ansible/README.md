@@ -28,41 +28,68 @@ Target machines need:
 
 ## Main Files
 
-- inventory: `inventories/customer-a/hosts`
+- dynamic inventory: `inventories/customer-a/inventory.py`
+- static inventory example: `inventories/customer-a/hosts.example`
 - shared variables: `inventories/customer-a/group_vars/all.yaml`
 - secret: `inventories/customer-a/secrets/`
-- main playbook: `deploy.yaml`
-- quick host information playbook: `predeploy-show-info.yaml`
+- main playbook: `playbooks/deploy.yaml`
+- quick host information playbook: `playbooks/predeploy-show-info.yaml`
+- SSH key bootstrap playbook: `playbooks/ssh-copy-id.yaml`
 - Ansible runner script: `scripts/run-ansible.sh`
 - script build bundle: `scripts/build-offline-bundle.sh`
 
-## Inventory
+## Project Layout
 
-Example:
-
-```ini
-[swarm_managers]
-192.168.1.143 docker_swarm_advertise_addr=192.168.1.143
-
-[swarm_workers]
-#192.168.1.152 docker_swarm_advertise_addr=192.168.1.152
-
-[linux:children]
-swarm_managers
-swarm_workers
-
-[linux:vars]
-ansible_user=ubuntu
-ansible_ssh_private_key_file=./inventories/customer-a/secrets/id_rsa
-ansible_become=true
-ansible_become_method=sudo
+```text
+Ansible/
+  playbooks/                 # executable playbooks
+  roles/                     # reusable role implementations
+  inventories/customer-a/    # dynamic inventory and customer variables
+  scripts/                   # Docker runner and offline bundle helpers
+  build/                     # Ansible runtime image Dockerfile
+  repo/                      # optional offline .deb package repositories
+  docs/                      # extended operational notes
 ```
 
-Meaning:
+## Inventory
 
-- SSH connections use the key at `ansible_ssh_private_key_file`
-- privilege escalation uses `sudo`
-- if a host requires a `sudo` password, provide it through a secret file or `-K`
+The active inventory is dynamic:
+
+```text
+inventories/customer-a/inventory.py
+```
+
+`ansible.cfg` points to this script. The script reads host lists from `.env` and
+generates Ansible groups such as:
+
+- `all_targets`
+- `ssh_copy_id_targets`
+- `linux`
+- `zabbix_agent_targets`
+- `swarm_managers`
+- `swarm_workers`
+- `swarm_backend_workers`
+- `swarm_file_server_workers`
+- `swarm_cache_ext_workers`
+- `swarm_cache_int_workers`
+
+Set host lists in `.env`:
+
+```env
+ANSIBLE_ALL_TARGET_HOSTS="172.16.5.3,172.16.3.21"
+ANSIBLE_SWARM_MANAGER_HOSTS="172.16.5.3"
+ANSIBLE_SWARM_BACKEND_WORKER_HOSTS="172.16.3.21,172.16.3.22"
+ANSIBLE_SWARM_FILE_SERVER_WORKER_HOSTS="172.16.3.25,172.16.3.26"
+ANSIBLE_SWARM_CACHE_SERVER_EXT_HOSTS="172.16.3.27,172.16.3.37"
+ANSIBLE_SWARM_CACHE_SERVER_EXT_TAGS="cache-server-ext-01,cache-server-ext-02"
+ANSIBLE_SWARM_CACHE_SERVER_INT_HOSTS="172.16.4.17,172.16.4.18"
+ANSIBLE_SWARM_CACHE_SERVER_INT_TAGS="cache-server-int-01,cache-server-int-02"
+ANSIBLE_SSH_COPY_ID_EXTRA_HOSTS="172.16.3.24,172.16.3.28"
+ANSIBLE_ZABBIX_AGENT_HOSTS="172.16.3.21,172.16.3.22"
+```
+
+Cache tag variables map positionally to cache host variables. For example,
+`172.16.3.27` gets `node_tag=cache-server-ext-01`.
 
 ## Secret
 
@@ -75,15 +102,20 @@ inventories/customer-a/secrets/
 Common files:
 
 - SSH private key: `inventories/customer-a/secrets/id_rsa`
+- SSH public key: `inventories/customer-a/secrets/id_rsa.pub`
 - optional sudo password: `inventories/customer-a/secrets/auth.yaml`
 
 Example `auth.yaml`:
 
 ```yaml
 ansible_become_password: "your-sudo-password"
+# Optional for the first SSH key bootstrap run.
+ansible_password: "your-ssh-password"
 ```
 
 `./scripts/run-ansible.sh` automatically loads `inventories/customer-a/secrets/auth.yaml` when the file exists.
+You can also set `ANSIBLE_PASSWORD` and `ANSIBLE_BECOME_PASSWORD` in `.env`;
+those values are passed as Ansible extra vars at runtime.
 
 ## Configuration Variables
 
@@ -123,6 +155,7 @@ Common environment variables:
 ANSIBLE_MANAGER_1_HOST=192.168.1.143
 ANSIBLE_SSH_USER=ubuntu
 ANSIBLE_SSH_PRIVATE_KEY_FILE=./inventories/customer-a/secrets/id_rsa
+ANSIBLE_SSH_COPY_ID_PUBLIC_KEY_FILE=./inventories/customer-a/secrets/id_rsa.pub
 ANSIBLE_HOSTNAME_VALUE=ubuntu-proxmox-01-vm
 ANSIBLE_NETWORK_INTERFACE=ens34
 ANSIBLE_NETWORK_IPV4_ADDRESS=192.168.1.151
@@ -138,24 +171,188 @@ For offline runs, prepare:
 - `repo/docker`
 - `repo/zabbix`
 
+## Quick Run Guide
+
+Use these steps for the current Docker-based Ansible workflow.
+
+### 1. Prepare `.env`
+
+Start from the example when `.env` does not exist:
+
+```bash
+cp .env.example .env
+```
+
+Set the runtime image:
+
+```env
+RUNTIME_IMAGE=
+LOCAL_RUNTIME_IMAGE=ansible-base-runtime:local
+```
+
+Set SSH user and key paths:
+
+```env
+ANSIBLE_SSH_USER=bcy_admin
+ANSIBLE_SSH_PRIVATE_KEY_FILE=./inventories/customer-a/secrets/id_rsa
+ANSIBLE_SSH_COPY_ID_PUBLIC_KEY_FILE=./inventories/customer-a/secrets/id_rsa.pub
+```
+
+For the first password-based SSH bootstrap, set:
+
+```env
+ANSIBLE_SSH_PASSWORD_AUTH=true
+ANSIBLE_SSH_COMMON_ARGS="-o PubkeyAuthentication=no -o PreferredAuthentications=password"
+ANSIBLE_PASSWORD=your-ssh-password
+ANSIBLE_BECOME_PASSWORD=your-sudo-password
+```
+
+After SSH keys are installed successfully, change these back:
+
+```env
+ANSIBLE_SSH_PASSWORD_AUTH=false
+ANSIBLE_PASSWORD=
+ANSIBLE_BECOME_PASSWORD=
+```
+
+### 2. Prepare the Runtime Image
+
+If the control machine can build the image locally:
+
+```bash
+./scripts/run-ansible.sh predeploy-show-info --syntax-check
+```
+
+If the control machine is offline, build the bundle on an online machine:
+
+```bash
+./scripts/build-offline-bundle.sh
+```
+
+Copy and extract the generated archive on the offline control machine, then run:
+
+```bash
+cd project
+./scripts/prepare-offline-control.sh
+```
+
+If you copied only the runtime tar file, pass it explicitly:
+
+```bash
+./scripts/prepare-offline-control.sh /path/to/ansible-runtime.tar
+```
+
+### 3. Copy SSH Key on the First Run
+
+When hosts only accept SSH password login, run:
+
+```bash
+./scripts/run-ansible.sh ssh-copy-id
+```
+
+or use the wrapper:
+
+```bash
+./scripts/run-ssh-copy-id-password.sh
+```
+
+This installs `ANSIBLE_SSH_COPY_ID_PUBLIC_KEY_FILE` into `authorized_keys` for
+all hosts in `ssh_copy_id_targets`.
+
+### 4. Validate Connectivity
+
+Show host information for Swarm manager and worker hosts:
+
+```bash
+./scripts/run-ansible.sh predeploy-show-info
+```
+
+Limit to all SSH bootstrap targets:
+
+```bash
+./scripts/run-ansible.sh predeploy-show-info --limit ssh_copy_id_targets
+```
+
+Limit to Zabbix agent targets:
+
+```bash
+./scripts/run-ansible.sh predeploy-show-info --limit zabbix_agent_targets
+```
+
+### 5. Run Deployment
+
+Check syntax:
+
+```bash
+./scripts/run-ansible.sh deploy --syntax-check
+```
+
+Run all enabled roles:
+
+```bash
+./scripts/run-ansible.sh deploy
+```
+
+Run only Zabbix agent:
+
+```bash
+./scripts/run-ansible.sh deploy --tags zabbix_agent
+```
+
+Run only Docker Swarm:
+
+```bash
+./scripts/run-ansible.sh deploy --tags docker_swarm
+```
+
 ## Validation Runs
 
 Show quick host information:
 
 ```bash
-./scripts/run-ansible.sh predeploy-show-info.yaml
+./scripts/run-ansible.sh predeploy-show-info
 ```
+
+Install the configured SSH public key on all target servers:
+
+```bash
+./scripts/run-ansible.sh ssh-copy-id
+```
+
+This playbook is the Ansible equivalent of `ssh-copy-id`. It reads
+`ANSIBLE_SSH_COPY_ID_PUBLIC_KEY_FILE`, or defaults to
+`ANSIBLE_SSH_PRIVATE_KEY_FILE + ".pub"` when the variable is empty. If the
+server still requires password login, add `ansible_password` to
+`inventories/customer-a/secrets/auth.yaml` for this first run.
+
+For the first run when hosts only accept SSH password login:
+
+```bash
+cp inventories/customer-a/secrets/auth.yaml.example inventories/customer-a/secrets/auth.yaml
+```
+
+Edit `inventories/customer-a/secrets/auth.yaml`, set `ansible_password`, then
+run:
+
+```bash
+./scripts/run-ssh-copy-id-password.sh
+```
+
+That wrapper temporarily sets `ANSIBLE_SSH_PASSWORD_AUTH=true` so Ansible uses
+the password from `auth.yaml` instead of the private key. After this succeeds,
+normal runs can use `./scripts/run-ansible.sh ssh-copy-id` or
+`./scripts/run-ansible.sh deploy`.
 
 Check syntax:
 
 ```bash
-./scripts/run-ansible.sh deploy.yaml --syntax-check
+./scripts/run-ansible.sh deploy --syntax-check
 ```
 
 Check syntax by tag:
 
 ```bash
-./scripts/run-ansible.sh deploy.yaml --syntax-check --tags network
+./scripts/run-ansible.sh deploy --syntax-check --tags network
 ```
 
 ## Run Online
@@ -179,9 +376,9 @@ inventories/customer-a/secrets/
 Then validate and run:
 
 ```bash
-./scripts/run-ansible.sh deploy.yaml --syntax-check
-./scripts/run-ansible.sh predeploy-show-info.yaml
-./scripts/run-ansible.sh deploy.yaml
+./scripts/run-ansible.sh deploy --syntax-check
+./scripts/run-ansible.sh predeploy-show-info
+./scripts/run-ansible.sh deploy
 ```
 
 If `LOCAL_RUNTIME_IMAGE` is not available locally, `scripts/run-ansible.sh`
@@ -231,9 +428,9 @@ Before running offline, make sure these items are already present:
 Then validate and run:
 
 ```bash
-./scripts/run-ansible.sh deploy.yaml --syntax-check
-./scripts/run-ansible.sh predeploy-show-info.yaml
-./scripts/run-ansible.sh deploy.yaml
+./scripts/run-ansible.sh deploy --syntax-check
+./scripts/run-ansible.sh predeploy-show-info
+./scripts/run-ansible.sh deploy
 ```
 
 When `ANSIBLE_CONTROL_OFFLINE=true`, `scripts/run-ansible.sh` does not pull or
@@ -245,49 +442,49 @@ run `./scripts/prepare-offline-control.sh`.
 Run the full base play:
 
 ```bash
-./scripts/run-ansible.sh deploy.yaml
+./scripts/run-ansible.sh deploy
 ```
 
 Run only prerequisite:
 
 ```bash
-./scripts/run-ansible.sh deploy.yaml --tags prerequisite
+./scripts/run-ansible.sh deploy --tags prerequisite
 ```
 
 Run only Docker:
 
 ```bash
-./scripts/run-ansible.sh deploy.yaml --tags docker
+./scripts/run-ansible.sh deploy --tags docker
 ```
 
 Configure Zabbix Agent:
 
 ```bash
-./scripts/run-ansible.sh deploy.yaml --tags zabbix
+./scripts/run-ansible.sh deploy --tags zabbix
 ```
 
 Change hostname:
 
 ```bash
-./scripts/run-ansible.sh deploy.yaml --tags hostname --limit 192.168.1.143
+./scripts/run-ansible.sh deploy --tags hostname --limit 192.168.1.143
 ```
 
 Change IP:
 
 ```bash
-./scripts/run-ansible.sh deploy.yaml --tags network --limit 192.168.1.143
+./scripts/run-ansible.sh deploy --tags network --limit 192.168.1.143
 ```
 
 Create or join Docker Swarm:
 
 ```bash
-./scripts/run-ansible.sh deploy.yaml --tags docker_swarm
+./scripts/run-ansible.sh deploy --tags docker_swarm
 ```
 
 If you do not use `auth.yaml`, let Ansible prompt for the `sudo` password at runtime:
 
 ```bash
-./scripts/run-ansible.sh deploy.yaml -K
+./scripts/run-ansible.sh deploy -K
 ```
 
 ## Notes When Changing Hostname And IP
@@ -314,12 +511,14 @@ Notes:
 
 - changing the hostname is usually safer than changing the IP address
 - change IP addresses one host at a time
-- after changing an IP address, update `inventories/customer-a/hosts`
+- after changing an IP address, update the matching host list in `.env`
 - the `network` role backs up `50-cloud-init.yaml` to `50-cloud-init.yaml.ansible.bak` when the file exists, then uses the new Netplan configuration to replace the old one
 
 ## Docker Swarm
 
-To run the Swarm role, the inventory needs manager and worker groups. Example:
+To run the Swarm role, the inventory needs manager and worker groups. With the
+current dynamic inventory, define these groups with the `ANSIBLE_SWARM_*`
+variables in `.env`. Static inventories can use a layout like this:
 
 ```ini
 [swarm_managers]
@@ -420,7 +619,7 @@ ANSIBLE_ZABBIX_AGENT_REPO_DEST=/media/installation/zabbix
 Run only Zabbix Agent configuration:
 
 ```bash
-./scripts/run-ansible.sh deploy.yaml --tags zabbix
+./scripts/run-ansible.sh deploy --tags zabbix
 ```
 
 ## Verify After Running

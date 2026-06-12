@@ -54,7 +54,7 @@ swarm_workers
   cluster worker nodes
 
 linux
-  parent group so deploy.yaml can still run with hosts: linux
+  parent group so playbooks/deploy.yaml can still run with hosts: linux
 ```
 
 For production, use an odd number of managers:
@@ -221,7 +221,7 @@ If you need multiple managers, add a task to get the manager token:
     - docker_swarm
 ```
 
-## Update deploy.yaml
+## Update playbooks/deploy.yaml
 
 Add the `docker_swarm` role after the `docker` role:
 
@@ -247,13 +247,13 @@ Add the `docker_swarm` role after the `docker` role:
 Run only the Swarm role:
 
 ```bash
-./scripts/run-ansible.sh deploy.yaml --tags docker_swarm
+./scripts/run-ansible.sh deploy --tags docker_swarm
 ```
 
 Run everything:
 
 ```bash
-./scripts/run-ansible.sh deploy.yaml
+./scripts/run-ansible.sh deploy
 ```
 
 ## Required Open Ports
@@ -348,7 +348,7 @@ Reset task if it is truly needed:
 Run only when explicitly requested:
 
 ```bash
-./scripts/run-ansible.sh deploy.yaml --tags docker_swarm_reset
+./scripts/run-ansible.sh deploy --tags docker_swarm_reset
 ```
 
 ## Notes

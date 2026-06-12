@@ -96,8 +96,8 @@ cd project
 Edit \`project/.env\` for the target hosts and SSH settings, then run:
 
 \`\`\`bash
-./scripts/run-ansible.sh deploy.yaml --syntax-check
-./scripts/run-ansible.sh deploy.yaml
+./scripts/run-ansible.sh deploy --syntax-check
+./scripts/run-ansible.sh deploy
 \`\`\`
 
 The runtime image packaged in this bundle is:

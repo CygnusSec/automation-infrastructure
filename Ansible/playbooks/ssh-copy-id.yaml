@@ -1,0 +1,22 @@
+---
+- name: Install SSH public key on target servers
+  hosts: "{{ ssh_copy_id_target_group | default('ssh_copy_id_targets') }}"
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Validate SSH public key source
+      ansible.builtin.assert:
+        that:
+          - ssh_copy_id_public_key_file | length > 0
+        fail_msg: "Set ssh_copy_id_public_key_file or ANSIBLE_SSH_COPY_ID_PUBLIC_KEY_FILE before running this playbook."
+      tags:
+        - ssh_copy_id
+
+    - name: Install SSH public key for Ansible user
+      ansible.posix.authorized_key:
+        user: "{{ ansible_user }}"
+        key: "{{ lookup('file', ssh_copy_id_public_key_file) }}"
+        state: present
+        manage_dir: true
+      tags:
+        - ssh_copy_id

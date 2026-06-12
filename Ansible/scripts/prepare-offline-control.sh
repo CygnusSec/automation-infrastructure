@@ -61,4 +61,4 @@ set_env_value "LOCAL_RUNTIME_IMAGE" "${RUNTIME_IMAGE_NAME}"
 set_env_value "RUNTIME_IMAGE" ""
 
 echo "Offline control machine is prepared."
-echo "Review ${ENV_FILE}, then run: ./scripts/run-ansible.sh deploy.yaml --syntax-check"
+echo "Review ${ENV_FILE}, then run: ./scripts/run-ansible.sh deploy --syntax-check"
