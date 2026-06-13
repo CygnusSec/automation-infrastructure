@@ -216,6 +216,7 @@ variable "vms" {
       size_gb          = number
       mount_path       = string
       label            = optional(string)
+      device           = optional(string)
       thin_provisioned = optional(bool, true)
     })), [])
     extra_network_interfaces = optional(list(object({

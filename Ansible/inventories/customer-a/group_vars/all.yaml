@@ -54,8 +54,13 @@ docker_packages:
 docker_users:
   - "{{ ansible_user }}"
 
+# SSH bootstrap.
+ssh_copy_id_public_key_file: "{{ lookup('env', 'ANSIBLE_SSH_COPY_ID_PUBLIC_KEY_FILE') | default(ansible_ssh_private_key_file ~ '.pub', true) }}"
+ssh_copy_id_target_group: "{{ lookup('env', 'ANSIBLE_SSH_COPY_ID_TARGET_GROUP') | default('ssh_copy_id_targets', true) }}"
+
 # Zabbix agent role
 zabbix_agent_enabled: "{{ (lookup('env', 'ANSIBLE_ZABBIX_AGENT_ENABLED') | default('false', true)) | bool }}"
+zabbix_agent_target_group: "{{ lookup('env', 'ANSIBLE_ZABBIX_AGENT_TARGET_GROUP') | default('linux', true) }}"
 zabbix_agent_install_from_local_repo: "{{ (lookup('env', 'ANSIBLE_ZABBIX_AGENT_INSTALL_FROM_LOCAL_REPO') | default('false', true)) | bool }}"
 zabbix_agent_repo_source: "{{ lookup('env', 'ANSIBLE_ZABBIX_AGENT_REPO_SOURCE') | default('./repo/zabbix', true) }}"
 zabbix_agent_repo_dest: "{{ lookup('env', 'ANSIBLE_ZABBIX_AGENT_REPO_DEST') | default('/media/installation/zabbix', true) }}"

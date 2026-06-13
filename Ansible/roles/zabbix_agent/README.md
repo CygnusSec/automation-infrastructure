@@ -20,5 +20,5 @@ When `ANSIBLE_ZABBIX_AGENT_HOSTNAME` is empty, the role uses `inventory_hostname
 Run only this role:
 
 ```bash
-./scripts/run-ansible.sh deploy.yaml --tags zabbix
+./scripts/run-ansible.sh deploy --tags zabbix
 ```

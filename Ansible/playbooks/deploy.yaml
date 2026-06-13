@@ -45,7 +45,7 @@
     - network
 
 - name: Configure Zabbix agents
-  hosts: linux
+  hosts: "{{ zabbix_agent_target_group | default('linux') }}"
   gather_facts: false
   become: true
   pre_tasks:

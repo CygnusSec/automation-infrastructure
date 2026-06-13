@@ -46,6 +46,11 @@ locals {
   resolved_guest_id         = var.guest_id != "" ? var.guest_id : data.vsphere_virtual_machine.template.guest_id
   resolved_adapter_type     = var.adapter_type != "" ? var.adapter_type : try(data.vsphere_virtual_machine.template.network_interface_types[0], "vmxnet3")
   resolved_thin_provisioned = var.thin_provisioned != null ? var.thin_provisioned : try(data.vsphere_virtual_machine.template.disks[0].thin_provisioned, true)
+  resolved_data_disks = [
+    for index, disk in var.data_disks : merge(disk, {
+      device = coalesce(disk.device, "/dev/sd${chr(98 + index)}")
+    })
+  ]
 
   metadata = templatefile("${path.module}/templates/metadata.yaml.tftpl", {
     instance_id        = coalesce(var.instance_id, var.vm_name)
@@ -63,7 +68,7 @@ locals {
     default_user_password     = var.default_user_password
     ssh_authorized_keys       = var.ssh_authorized_keys
     extra_cloud_init_userdata = var.extra_cloud_init_userdata
-    data_disks                = var.data_disks
+    data_disks                = local.resolved_data_disks
   })
 }
 

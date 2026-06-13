@@ -41,7 +41,7 @@ runcmd:
     netplan apply
 %{ for i, disk in data_disks ~}
   - |
-    DISK="/dev/sd${chr(98 + i)}"
+    DISK="${disk.device}"
     if [ ! -b "$${DISK}1" ]; then
       parted -s $${DISK} mklabel gpt
       parted -s $${DISK} mkpart primary ext4 0% 100%

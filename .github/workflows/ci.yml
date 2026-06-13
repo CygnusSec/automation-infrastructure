@@ -66,8 +66,8 @@ jobs:
       - name: Check Ansible playbook syntax
         working-directory: Ansible
         run: |
-          ansible-playbook deploy.yaml --syntax-check
-          ansible-playbook predeploy-show-info.yaml --syntax-check
+          ansible-playbook playbooks/deploy.yaml --syntax-check
+          ansible-playbook playbooks/predeploy-show-info.yaml --syntax-check
 
       - name: Render Ansible Docker Compose config
         working-directory: Ansible
@@ -90,5 +90,6 @@ jobs:
           bash -n Terraform/scripts/run-terraform.sh
           bash -n Terraform/scripts/build-docker-offline-bundle.sh
           bash -n Ansible/scripts/run-ansible.sh
+          bash -n Ansible/scripts/run-ssh-copy-id-password.sh
           bash -n Ansible/scripts/build-offline-bundle.sh
           bash -n Ansible/scripts/prepare-offline-control.sh
