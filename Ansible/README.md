@@ -711,12 +711,13 @@ ANSIBLE_ZABBIX_AGENT_REMOVE_LEGACY_AGENT=true
 ```
 
 `ANSIBLE_ZABBIX_SERVER_HOST` must be the IP address or DNS name of the control
-machine as seen from target hosts. `ANSIBLE_ZABBIX_AGENT_HOSTNAME` is optional;
-when it is empty, the role uses the target machine hostname from
+machine as seen from target hosts. Keep `ANSIBLE_ZABBIX_AGENT_HOSTNAME=` empty
+for normal use so each agent uses its own machine hostname from
 `ansible_hostname`, falling back to `inventory_hostname` only if facts are not
-available. `ANSIBLE_ZABBIX_AGENT_MANAGE_APT_REPO=true` installs the Zabbix 7.0
-Ubuntu 24.04 release package before online apt installs. The role also removes
-legacy `zabbix-agent` by default before installing Agent 2.
+available. Set it only when you intentionally want to force the same hostname
+for every targeted agent. `ANSIBLE_ZABBIX_AGENT_MANAGE_APT_REPO=true` installs
+the Zabbix 7.0 Ubuntu 24.04 release package before online apt installs. The
+role also removes legacy `zabbix-agent` by default before installing Agent 2.
 
 For offline target hosts, place Zabbix agent `.deb` packages under:
 

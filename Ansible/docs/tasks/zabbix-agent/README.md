@@ -27,8 +27,10 @@ want the server to also run an agent.
 - writes `Server=`, `ServerActive=`, and `Hostname=`
 - enables and starts `zabbix-agent2`
 
-When `ANSIBLE_ZABBIX_AGENT_HOSTNAME` is empty, `Hostname=` is set from the
-target machine hostname gathered as `ansible_hostname`.
+Keep `ANSIBLE_ZABBIX_AGENT_HOSTNAME=` empty for normal use. With this default,
+`Hostname=` is set from each target machine hostname gathered as
+`ansible_hostname`. Set a value only when you intentionally want to force the
+same hostname for every targeted agent.
 
 ## Key Variables
 
@@ -73,4 +75,3 @@ The build script downloads Zabbix Agent 2 `.deb` packages into:
 ```text
 Ansible/repo/zabbix/
 ```
-

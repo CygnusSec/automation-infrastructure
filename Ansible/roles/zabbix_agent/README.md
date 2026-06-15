@@ -9,15 +9,17 @@ with:
 ANSIBLE_ZABBIX_SERVER_HOST=192.168.1.10
 ```
 
-Set the agent hostname globally when needed:
+Keep the agent hostname empty for normal use:
 
 ```env
-ANSIBLE_ZABBIX_AGENT_HOSTNAME=app-01
+ANSIBLE_ZABBIX_AGENT_HOSTNAME=
 ```
 
-When `ANSIBLE_ZABBIX_AGENT_HOSTNAME` is empty, the role uses the target machine
-hostname from `ansible_hostname`, falling back to `inventory_hostname` only if
-facts are not available.
+With this default, each agent writes its own machine hostname into
+`Hostname=`. The value comes from `ansible_hostname`, falling back to
+`inventory_hostname` only if facts are not available. Set
+`ANSIBLE_ZABBIX_AGENT_HOSTNAME` only when you intentionally want to force the
+same hostname value for every targeted agent.
 
 Default packages:
 
