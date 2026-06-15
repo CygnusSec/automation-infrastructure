@@ -167,7 +167,15 @@ def build_inventory():
     set_group_vars(inventory, "zabbix_agent_targets", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
     set_group_vars(inventory, "dns_time_servers", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
     set_group_vars(inventory, "external_disk_targets", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
-    set_group_vars(inventory, "ssh_copy_id_targets", connection_vars(become=False))
+    set_group_vars(
+        inventory,
+        "ssh_copy_id_targets",
+        {
+            key: value
+            for key, value in connection_vars(become=env_bool("ANSIBLE_BECOME", "true")).items()
+            if key != "ansible_become"
+        },
+    )
 
     return inventory
 
