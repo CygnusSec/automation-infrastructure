@@ -63,6 +63,20 @@
     - zabbix
     - zabbix_agent
 
+- name: Uninstall Zabbix agents
+  hosts: "{{ zabbix_agent_target_group | default('linux') }}"
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Uninstall Zabbix agent packages
+      ansible.builtin.include_role:
+        name: zabbix_agent
+        tasks_from: uninstall
+      tags:
+        - zabbix_agent_uninstall
+  tags:
+    - zabbix_agent_uninstall
+
 - name: Configure Dockerized DNS and time servers
   hosts: "{{ dns_time_services_target_group | default('dns_time_servers') }}"
   gather_facts: false

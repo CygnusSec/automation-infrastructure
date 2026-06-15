@@ -26,6 +26,10 @@ ANSIBLE_DNS_SERVER_IMAGE="${ANSIBLE_DNS_SERVER_IMAGE:-local/bind9:offline}"
 ANSIBLE_DNS_SERVER_IMAGE_TAR="${ANSIBLE_DNS_SERVER_IMAGE_TAR:-./repo/docker-images/bind9.tar}"
 ANSIBLE_TIME_SERVER_IMAGE="${ANSIBLE_TIME_SERVER_IMAGE:-local/chrony:offline}"
 ANSIBLE_TIME_SERVER_IMAGE_TAR="${ANSIBLE_TIME_SERVER_IMAGE_TAR:-./repo/docker-images/chrony.tar}"
+ANSIBLE_ZABBIX_AGENT_DOWNLOAD_PACKAGES="${ANSIBLE_ZABBIX_AGENT_DOWNLOAD_PACKAGES:-true}"
+ANSIBLE_ZABBIX_AGENT_REPO_SOURCE="${ANSIBLE_ZABBIX_AGENT_REPO_SOURCE:-./repo/zabbix}"
+ANSIBLE_ZABBIX_AGENT_RELEASE_URL="${ANSIBLE_ZABBIX_AGENT_RELEASE_URL:-https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb}"
+ANSIBLE_ZABBIX_AGENT_OFFLINE_PACKAGES="${ANSIBLE_ZABBIX_AGENT_OFFLINE_PACKAGES:-zabbix-agent2 zabbix-agent2-plugin-mongodb zabbix-agent2-plugin-mssql zabbix-agent2-plugin-postgresql}"
 
 if [[ "${RUNTIME_IMAGE}" == *.tar || "${RUNTIME_IMAGE}" == *.tar.gz ]]; then
   echo "Ignoring RUNTIME_IMAGE tar path while building bundle: ${RUNTIME_IMAGE}"
@@ -69,6 +73,37 @@ build_service_image() {
   echo "Saving ${name} service image: ${tar_path}"
   docker save "${image}" -o "${tar_path}"
 }
+
+download_zabbix_agent_packages() {
+  local repo_dir="$1"
+
+  mkdir -p "${repo_dir}"
+
+  echo "Downloading Zabbix Agent 2 offline packages into: ${repo_dir}"
+  docker run --rm \
+    -e "ZABBIX_RELEASE_URL=${ANSIBLE_ZABBIX_AGENT_RELEASE_URL}" \
+    -e "ZABBIX_PACKAGES=${ANSIBLE_ZABBIX_AGENT_OFFLINE_PACKAGES}" \
+    -v "${repo_dir}:/zabbix-debs" \
+    ubuntu:24.04 \
+    bash -lc '
+      set -euo pipefail
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update
+      apt-get install -y --no-install-recommends ca-certificates wget
+      wget -O /tmp/zabbix-release.deb "${ZABBIX_RELEASE_URL}"
+      dpkg -i /tmp/zabbix-release.deb
+      apt-get update
+      mkdir -p /zabbix-debs/partial
+      apt-get install -y --download-only --no-install-recommends \
+        -o Dir::Cache::archives=/zabbix-debs \
+        ${ZABBIX_PACKAGES}
+      find /zabbix-debs -maxdepth 1 -type f -name "*.deb" -print | sort
+    '
+}
+
+if [[ "${ANSIBLE_ZABBIX_AGENT_DOWNLOAD_PACKAGES}" == "true" ]]; then
+  download_zabbix_agent_packages "$(project_path "${ANSIBLE_ZABBIX_AGENT_REPO_SOURCE}")"
+fi
 
 if [[ "${ANSIBLE_DNS_TIME_SERVICES_BUILD_IMAGES}" == "true" ]]; then
   build_service_image \

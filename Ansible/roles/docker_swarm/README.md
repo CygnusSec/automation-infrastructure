@@ -2,6 +2,21 @@
 
 Initializes a Docker Swarm on the first manager and joins the remaining managers and workers.
 
+## Commands
+
+Initialize or converge Swarm:
+
+```bash
+cd Ansible
+./scripts/run-ansible.sh deploy --tags docker_swarm
+```
+
+Configure iptables separately:
+
+```bash
+./scripts/run-ansible.sh deploy --tags docker_swarm_iptables
+```
+
 Inventory example:
 
 ```ini
@@ -69,3 +84,8 @@ Override or add labels per host when needed:
 [swarm_app_workers]
 192.168.1.152 docker_swarm_advertise_addr=192.168.1.152 docker_swarm_node_labels='{"rack":"rack-a"}'
 ```
+
+## Task Runbooks
+
+- [Docker Swarm](../../docs/tasks/docker-swarm/README.md)
+- [Docker Swarm iptables](../../docs/tasks/docker-swarm-iptables/README.md)

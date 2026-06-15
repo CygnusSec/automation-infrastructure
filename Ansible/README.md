@@ -38,6 +38,41 @@ Target machines need:
 - Ansible runner script: `scripts/run-ansible.sh`
 - script build bundle: `scripts/build-offline-bundle.sh`
 
+## Task Runbooks
+
+Detailed English runbooks are split by task under:
+
+```text
+docs/tasks/
+```
+
+Start with the task index:
+
+```text
+docs/tasks/README.md
+```
+
+Common task runbooks:
+
+- [Predeploy Show Info](docs/tasks/predeploy-show-info/README.md)
+- [SSH Key Bootstrap](docs/tasks/ssh-copy-id/README.md)
+- [Base Preparation](docs/tasks/base/README.md)
+- [Prerequisite](docs/tasks/prerequisite/README.md)
+- [Docker](docs/tasks/docker/README.md)
+- [Hostname](docs/tasks/hostname/README.md)
+- [Network](docs/tasks/network/README.md)
+- [Zabbix Agent 2 Install](docs/tasks/zabbix-agent/README.md)
+- [Zabbix Agent Uninstall](docs/tasks/zabbix-agent-uninstall/README.md)
+- [DNS And Time Services](docs/tasks/dns-time-services/README.md)
+- [DNS Server](docs/tasks/dns-server/README.md)
+- [Time Server](docs/tasks/time-server/README.md)
+- [NTP Client](docs/tasks/ntp-client/README.md)
+- [External Disk](docs/tasks/external-disk/README.md)
+- [Docker Swarm](docs/tasks/docker-swarm/README.md)
+- [Docker Swarm iptables](docs/tasks/docker-swarm-iptables/README.md)
+- [Offline Bundle Build](docs/tasks/offline-bundle/README.md)
+- [Offline Control Prepare](docs/tasks/offline-control/README.md)
+
 ## Project Layout
 
 ```text
@@ -48,7 +83,7 @@ Ansible/
   scripts/                   # Docker runner and offline bundle helpers
   build/                     # Ansible runtime image Dockerfile
   repo/                      # optional offline .deb package repositories
-  docs/                      # extended operational notes
+  docs/tasks/                # task-by-task runbooks
 ```
 
 ## Inventory
@@ -425,6 +460,27 @@ project/repo/docker-images/bind9.tar
 project/repo/docker-images/chrony.tar
 ```
 
+It also downloads Zabbix Agent 2 offline `.deb` packages into
+`project/repo/zabbix` when `ANSIBLE_ZABBIX_AGENT_DOWNLOAD_PACKAGES=true` or
+unset. The default Zabbix repository package is:
+
+```text
+https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb
+```
+
+The default downloaded packages are:
+
+```text
+zabbix-agent2
+zabbix-agent2-plugin-mongodb
+zabbix-agent2-plugin-mssql
+zabbix-agent2-plugin-postgresql
+```
+
+Override `ANSIBLE_ZABBIX_AGENT_RELEASE_URL` and
+`ANSIBLE_ZABBIX_AGENT_OFFLINE_PACKAGES` in `.env` if you need a different
+Ubuntu or Zabbix version.
+
 This creates:
 
 ```text
@@ -452,6 +508,8 @@ Before running offline, make sure these items are already present:
 - optional sudo secret at `inventories/customer-a/secrets/auth.yaml`
 - local `.deb` packages under `repo/prerequisite` and `repo/docker` if target
   hosts cannot install packages from apt repositories
+- local Zabbix Agent 2 `.deb` packages under `repo/zabbix` when deploying
+  Zabbix Agent offline
 - local service image tar files under `repo/docker-images` when deploying
   Dockerized DNS/time services offline
 
@@ -644,12 +702,21 @@ Set these values in `.env`:
 ANSIBLE_ZABBIX_AGENT_ENABLED=true
 ANSIBLE_ZABBIX_SERVER_HOST=192.168.1.10
 ANSIBLE_ZABBIX_AGENT_HOSTNAME=
+ANSIBLE_ZABBIX_AGENT_MANAGE_APT_REPO=true
+ANSIBLE_ZABBIX_AGENT_RELEASE_URL=https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb
+ANSIBLE_ZABBIX_AGENT_PACKAGES=[zabbix-agent2, zabbix-agent2-plugin-mongodb, zabbix-agent2-plugin-mssql, zabbix-agent2-plugin-postgresql]
+ANSIBLE_ZABBIX_AGENT_SERVICE_NAME=zabbix-agent2
+ANSIBLE_ZABBIX_AGENT_CONFIG_FILE=/etc/zabbix/zabbix_agent2.conf
+ANSIBLE_ZABBIX_AGENT_REMOVE_LEGACY_AGENT=true
 ```
 
 `ANSIBLE_ZABBIX_SERVER_HOST` must be the IP address or DNS name of the control
 machine as seen from target hosts. `ANSIBLE_ZABBIX_AGENT_HOSTNAME` is optional;
-when it is empty, the role uses `inventory_hostname` so each target keeps a
-unique agent hostname.
+when it is empty, the role uses the target machine hostname from
+`ansible_hostname`, falling back to `inventory_hostname` only if facts are not
+available. `ANSIBLE_ZABBIX_AGENT_MANAGE_APT_REPO=true` installs the Zabbix 7.0
+Ubuntu 24.04 release package before online apt installs. The role also removes
+legacy `zabbix-agent` by default before installing Agent 2.
 
 For offline target hosts, place Zabbix agent `.deb` packages under:
 
@@ -665,11 +732,28 @@ ANSIBLE_ZABBIX_AGENT_REPO_SOURCE=./repo/zabbix
 ANSIBLE_ZABBIX_AGENT_REPO_DEST=/media/installation/zabbix
 ```
 
+On the online build machine, `./scripts/build-offline-bundle.sh` downloads
+these Zabbix Agent 2 packages automatically by using the Zabbix 7.0 Ubuntu
+24.04 release package. The downloaded packages are included in the offline
+bundle under `project/repo/zabbix`.
+
 Run only Zabbix Agent configuration:
 
 ```bash
 ./scripts/run-ansible.sh deploy --tags zabbix
 ```
+
+Uninstall Zabbix Agent and plugins from the target group:
+
+```bash
+./scripts/run-ansible.sh deploy --tags zabbix_agent_uninstall
+```
+
+By default uninstall stops both `zabbix-agent2` and legacy `zabbix-agent`, then
+removes `zabbix-agent2`, the MongoDB/MSSQL/PostgreSQL agent2 plugins, and the
+legacy `zabbix-agent` package if it exists. Set
+`ANSIBLE_ZABBIX_AGENT_UNINSTALL_REMOVE_LOCAL_REPO=true` if the copied offline
+package directory under `ANSIBLE_ZABBIX_AGENT_REPO_DEST` should also be removed.
 
 ## Dockerized DNS And Time Servers
 
