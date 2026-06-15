@@ -127,10 +127,10 @@
 - name: Fail when filesystem is missing and formatting is disabled
   ansible.builtin.fail:
     msg: >-
-      Partition {{ external_disk_partition }} has no filesystem and
-      external_disk_format=false.
+      Partition {{ external_disk_partition }} does not have a usable
+      {{ external_disk_fstype }} filesystem and external_disk_format=false.
   when:
-    - external_disk_fs_type.rc != 0
+    - external_disk_fs_type.rc != 0 or external_disk_fs_type.stdout | trim | length == 0
     - not external_disk_format | bool
   tags:
     - external_disk
@@ -138,7 +138,7 @@
 - name: Format external disk partition
   ansible.builtin.command: "mkfs.{{ external_disk_fstype }} -F {{ external_disk_partition }}"
   when:
-    - external_disk_fs_type.rc != 0
+    - external_disk_fs_type.rc != 0 or external_disk_fs_type.stdout | trim | length == 0
     - external_disk_format | bool
   changed_when: true
   tags:
@@ -168,41 +168,15 @@
   ansible.builtin.command: blkid -o value -s UUID "{{ external_disk_partition }}"
   register: external_disk_uuid
   changed_when: false
-  failed_when: false
   until: external_disk_uuid.stdout | trim | length > 0
   retries: 5
   delay: 2
   tags:
     - external_disk
 
-- name: Assign UUID to ext4 filesystem when missing
-  ansible.builtin.command: tune2fs -U random "{{ external_disk_partition }}"
-  when:
-    - external_disk_uuid.stdout | trim | length == 0
-    - external_disk_fstype == "ext4"
-  changed_when: true
-  tags:
-    - external_disk
-
-- name: Refresh external disk UUID
-  ansible.builtin.command: blkid -o value -s UUID "{{ external_disk_partition }}"
-  register: external_disk_uuid_refresh
-  changed_when: false
-  failed_when: false
-  when: external_disk_uuid.stdout | trim | length == 0
-  tags:
-    - external_disk
-
 - name: Set effective external disk UUID
   ansible.builtin.set_fact:
-    external_disk_effective_uuid: >-
-      {{
-        (
-          external_disk_uuid_refresh.stdout
-          if external_disk_uuid_refresh is defined and external_disk_uuid_refresh.stdout | trim | length > 0
-          else external_disk_uuid.stdout
-        ) | trim
-      }}
+    external_disk_effective_uuid: "{{ external_disk_uuid.stdout | trim }}"
   tags:
     - external_disk
 

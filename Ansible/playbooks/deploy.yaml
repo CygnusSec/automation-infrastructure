@@ -121,3 +121,18 @@
       when: docker_swarm_enabled | bool
   tags:
     - docker_swarm
+
+- name: Configure Docker Swarm iptables
+  hosts: "{{ docker_swarm_target_group | default('swarm_managers:swarm_workers') }}"
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Configure Docker Swarm iptables rules
+      ansible.builtin.include_role:
+        name: docker_swarm
+        tasks_from: iptables
+      when: docker_swarm_manage_iptables | bool
+      tags:
+        - docker_swarm_iptables
+  tags:
+    - docker_swarm_iptables

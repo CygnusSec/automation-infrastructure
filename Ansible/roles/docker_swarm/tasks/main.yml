@@ -34,13 +34,6 @@
   tags:
     - docker_swarm
 
-- name: Configure Docker Swarm iptables rules
-  ansible.builtin.include_tasks: iptables.yml
-  when: docker_swarm_manage_iptables | bool
-  tags:
-    - docker_swarm
-    - docker_swarm_iptables
-
 - name: Check Docker Swarm state
   ansible.builtin.command: docker info --format '{{ "{{" }} .Swarm.LocalNodeState {{ "}}" }}'
   register: docker_swarm_state

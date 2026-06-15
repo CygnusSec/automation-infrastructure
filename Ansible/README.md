@@ -511,6 +511,12 @@ Create or join Docker Swarm:
 ./scripts/run-ansible.sh deploy --tags docker_swarm
 ```
 
+Configure Docker Swarm iptables rules separately:
+
+```bash
+./scripts/run-ansible.sh deploy --tags docker_swarm_iptables
+```
+
 Configure NTP clients:
 
 ```bash
@@ -590,7 +596,7 @@ docker_swarm_listen_addr: "0.0.0.0:2377"
 docker_swarm_port: 2377
 docker_swarm_force_reset: false
 docker_swarm_manager_addr: ""
-docker_swarm_manage_iptables: true
+docker_swarm_manage_iptables: false
 docker_swarm_iptables_source_cidr: "0.0.0.0/0"
 docker_swarm_manage_encrypted_overlay_esp: false
 docker_swarm_service_ports:
@@ -604,12 +610,13 @@ managers and workers automatically. If `docker_swarm_manager_addr` is empty, the
 role uses the primary manager's `docker_swarm_advertise_addr`, then `ansible_host`,
 then `inventory_hostname`.
 
-With `docker_swarm_manage_iptables: true`, the role opens the standard Swarm
-iptables rules: `2377/tcp` on manager nodes, `7946/tcp`, `7946/udp`, and
-`4789/udp` on all manager/worker nodes. Set
-`docker_swarm_manage_encrypted_overlay_esp: true` to allow IP protocol `50`
-(`esp`) when using encrypted overlay networks. Add published application ports
-to `docker_swarm_service_ports`.
+Docker Swarm iptables is a separate run. `--tags docker_swarm` only initializes
+and joins Swarm nodes. If `docker_swarm_manage_iptables: true`, run
+`--tags docker_swarm_iptables` to open the standard Swarm iptables rules:
+`2377/tcp` on manager nodes, `7946/tcp`, `7946/udp`, and `4789/udp` on all
+manager/worker nodes. Set `docker_swarm_manage_encrypted_overlay_esp: true` to
+allow IP protocol `50` (`esp`) when using encrypted overlay networks. Add
+published application ports to `docker_swarm_service_ports`.
 
 Node labels can be assigned by inventory group:
 

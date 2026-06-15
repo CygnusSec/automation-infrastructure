@@ -8,7 +8,7 @@ docker_swarm_port: 2377
 docker_swarm_force_reset: false
 docker_swarm_manager_addr: ""
 
-docker_swarm_manage_iptables: true
+docker_swarm_manage_iptables: false
 docker_swarm_iptables_source_cidr: "0.0.0.0/0"
 docker_swarm_iptables_comment_prefix: "ansible docker swarm"
 docker_swarm_manage_encrypted_overlay_esp: false

@@ -128,7 +128,7 @@ docker_swarm_listen_addr: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_LISTEN_ADDR') 
 docker_swarm_port: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_PORT') | default('2377', true)) | int }}"
 docker_swarm_force_reset: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_FORCE_RESET') | default('false', true)) | bool }}"
 docker_swarm_manager_addr: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_MANAGER_ADDR') | default('', true) }}"
-docker_swarm_manage_iptables: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_MANAGE_IPTABLES') | default('true', true)) | bool }}"
+docker_swarm_manage_iptables: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_MANAGE_IPTABLES') | default('false', true)) | bool }}"
 docker_swarm_iptables_source_cidr: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_IPTABLES_SOURCE_CIDR') | default('0.0.0.0/0', true) }}"
 docker_swarm_manage_encrypted_overlay_esp: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_MANAGE_ENCRYPTED_OVERLAY_ESP') | default('false', true)) | bool }}"
 # Add published application ports here when needed.
