@@ -17,20 +17,6 @@
   tags:
     - external_disk
 
-- name: Check required disk commands
-  ansible.builtin.command: "command -v {{ item }}"
-  register: external_disk_required_commands
-  changed_when: false
-  loop:
-    - lsblk
-    - blkid
-    - sfdisk
-    - "mkfs.{{ external_disk_fstype }}"
-    - mount
-    - findmnt
-  tags:
-    - external_disk
-
 - name: Check external disk device exists
   ansible.builtin.stat:
     path: "{{ external_disk_device }}"
@@ -85,10 +71,12 @@
   tags:
     - external_disk
 
-- name: Create single Linux partition on external disk
-  ansible.builtin.command: sfdisk "{{ external_disk_device }}"
+- name: Create single primary partition on external disk
+  ansible.builtin.shell: |
+    set -euo pipefail
+    printf 'n\np\n1\n\n\nw\n' | fdisk "{{ external_disk_device }}"
   args:
-    stdin: ",,L\n"
+    executable: /bin/bash
   when:
     - not external_disk_partition_stat.stat.exists
     - external_disk_create_partition | bool
@@ -265,13 +253,10 @@
   tags:
     - external_disk
 
-- name: Mount external disk
-  ansible.builtin.command: mount "{{ external_disk_mount_path }}"
+- name: Mount filesystems from fstab
+  ansible.builtin.command: mount -a
   register: external_disk_mount
-  changed_when: external_disk_mount.rc == 0
-  failed_when:
-    - external_disk_mount.rc != 0
-    - "'already mounted' not in external_disk_mount.stderr"
+  changed_when: false
   tags:
     - external_disk
 
