@@ -237,6 +237,9 @@ Before running Ansible offline, make sure:
 - SSH keys and optional sudo secret are present
 - local `.deb` payloads exist under `Ansible/repo/` when target hosts cannot use
   apt repositories
+- Dockerized DNS/time image tar files exist under
+  `Ansible/repo/docker-images/` when deploying those services offline. The
+  Ansible bundle builder creates them automatically by default.
 
 Relevant Ansible repo directories:
 
@@ -244,6 +247,7 @@ Relevant Ansible repo directories:
 Ansible/repo/prerequisite/
 Ansible/repo/docker/
 Ansible/repo/zabbix/
+Ansible/repo/docker-images/
 ```
 
 ## Safety Notes

@@ -60,6 +60,23 @@
     - zabbix
     - zabbix_agent
 
+- name: Configure Dockerized DNS and time servers
+  hosts: "{{ dns_time_services_target_group | default('dns_time_servers') }}"
+  gather_facts: false
+  become: true
+  pre_tasks:
+    - name: Gather facts
+      ansible.builtin.setup:
+      tags:
+        - always
+  roles:
+    - role: dns_time_services
+      when: dns_time_services_enabled | bool
+  tags:
+    - dns_time_services
+    - dns_server
+    - time_server
+
 - name: Configure Docker Swarm
   hosts: "{{ docker_swarm_target_group | default('swarm_managers:swarm_workers') }}"
   gather_facts: false

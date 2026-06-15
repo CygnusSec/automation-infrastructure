@@ -72,6 +72,7 @@ generates Ansible groups such as:
 - `swarm_file_server_workers`
 - `swarm_cache_ext_workers`
 - `swarm_cache_int_workers`
+- `dns_time_servers`
 
 Set host lists in `.env`:
 
@@ -148,6 +149,9 @@ Main variable groups:
 - `hostname_*`
 - `network_*`
 - `docker_swarm_*`
+- `dns_time_services_*`
+- `dns_server_*`
+- `time_server_*`
 
 Common environment variables:
 
@@ -397,6 +401,14 @@ cp .env.example .env
 ./scripts/build-offline-bundle.sh
 ```
 
+The build script also builds and saves the Dockerized DNS/time service images
+when `ANSIBLE_DNS_TIME_SERVICES_BUILD_IMAGES=true` or unset:
+
+```text
+project/repo/docker-images/bind9.tar
+project/repo/docker-images/chrony.tar
+```
+
 This creates:
 
 ```text
@@ -424,6 +436,8 @@ Before running offline, make sure these items are already present:
 - optional sudo secret at `inventories/customer-a/secrets/auth.yaml`
 - local `.deb` packages under `repo/prerequisite` and `repo/docker` if target
   hosts cannot install packages from apt repositories
+- local service image tar files under `repo/docker-images` when deploying
+  Dockerized DNS/time services offline
 
 Then validate and run:
 
@@ -620,6 +634,84 @@ Run only Zabbix Agent configuration:
 
 ```bash
 ./scripts/run-ansible.sh deploy --tags zabbix
+```
+
+## Dockerized DNS And Time Servers
+
+DNS and time services are deployed as Docker containers. The role does not pull
+images from a registry during deployment. For offline environments, prepare
+image tar files on an online machine and copy them to the Ansible control
+machine.
+
+The target hosts must already have Docker installed and running. This role only
+loads service images from tar files and starts containers; it does not install
+Docker or any native DNS/time packages.
+
+Default target hosts:
+
+```env
+ANSIBLE_DNS_TIME_SERVER_HOSTS="172.16.3.200,172.16.3.201"
+```
+
+Default local image tar paths:
+
+```text
+repo/docker-images/bind9.tar
+repo/docker-images/chrony.tar
+```
+
+The normal offline bundle flow creates those tar files automatically:
+
+```bash
+./scripts/build-offline-bundle.sh
+```
+
+It builds the service images from:
+
+```text
+build/dns-server.Dockerfile
+build/time-server.Dockerfile
+```
+
+Then saves them into `repo/docker-images/` before packaging the bundle. Set the
+matching image names in `.env`:
+
+```env
+ANSIBLE_DNS_TIME_SERVICES_ENABLED=true
+ANSIBLE_DNS_TIME_SERVER_HOSTS="172.16.3.200,172.16.3.201"
+ANSIBLE_DNS_TIME_SERVICES_LOAD_IMAGES=true
+ANSIBLE_DNS_TIME_SERVICES_BUILD_IMAGES=true
+
+ANSIBLE_DNS_SERVER_IMAGE=local/bind9:offline
+ANSIBLE_DNS_SERVER_IMAGE_TAR=./repo/docker-images/bind9.tar
+ANSIBLE_DNS_SERVER_ALLOW_QUERY="[172.16.0.0/16]"
+ANSIBLE_DNS_SERVER_FORWARDERS=[]
+
+ANSIBLE_TIME_SERVER_IMAGE=local/chrony:offline
+ANSIBLE_TIME_SERVER_IMAGE_TAR=./repo/docker-images/chrony.tar
+ANSIBLE_TIME_SERVER_ALLOW="[172.16.0.0/16]"
+ANSIBLE_TIME_SERVER_UPSTREAM_SERVERS=[]
+```
+
+The image tag in each tar file must match the configured image name. For
+example, `ANSIBLE_DNS_SERVER_IMAGE=local/bind9:offline` requires the tar file to
+contain `local/bind9:offline`. The default commands expect the DNS image to
+provide `named` and the time image to provide `chronyd`.
+
+The containers run with host networking so DNS listens on port `53` and the
+time service listens on UDP port `123` on the target host.
+
+Run only DNS and time services:
+
+```bash
+./scripts/run-ansible.sh deploy --tags dns_time_services
+```
+
+Run only one side:
+
+```bash
+./scripts/run-ansible.sh deploy --tags dns_server
+./scripts/run-ansible.sh deploy --tags time_server
 ```
 
 ## Verify After Running

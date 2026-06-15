@@ -1,0 +1,16 @@
+driftfile /var/lib/chrony/chrony.drift
+makestep 1.0 3
+rtcsync
+
+{% for server in time_server_upstream_servers %}
+server {{ server }} iburst
+{% endfor %}
+
+local stratum {{ time_server_local_stratum }}
+
+{% for cidr in time_server_allow %}
+allow {{ cidr }}
+{% endfor %}
+
+bindaddress 0.0.0.0
+logdir /var/log/chrony

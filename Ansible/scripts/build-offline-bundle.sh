@@ -21,6 +21,25 @@ fi
 
 RUNTIME_IMAGE="${RUNTIME_IMAGE:-}"
 LOCAL_RUNTIME_IMAGE="${LOCAL_RUNTIME_IMAGE:-ansible-base-runtime:local}"
+ANSIBLE_DNS_TIME_SERVICES_BUILD_IMAGES="${ANSIBLE_DNS_TIME_SERVICES_BUILD_IMAGES:-true}"
+ANSIBLE_DNS_SERVER_IMAGE="${ANSIBLE_DNS_SERVER_IMAGE:-local/bind9:offline}"
+ANSIBLE_DNS_SERVER_IMAGE_TAR="${ANSIBLE_DNS_SERVER_IMAGE_TAR:-./repo/docker-images/bind9.tar}"
+ANSIBLE_TIME_SERVER_IMAGE="${ANSIBLE_TIME_SERVER_IMAGE:-local/chrony:offline}"
+ANSIBLE_TIME_SERVER_IMAGE_TAR="${ANSIBLE_TIME_SERVER_IMAGE_TAR:-./repo/docker-images/chrony.tar}"
+
+if [[ "${RUNTIME_IMAGE}" == *.tar || "${RUNTIME_IMAGE}" == *.tar.gz ]]; then
+  echo "Ignoring RUNTIME_IMAGE tar path while building bundle: ${RUNTIME_IMAGE}"
+  RUNTIME_IMAGE=""
+fi
+
+project_path() {
+  local path="$1"
+  if [[ "${path}" = /* ]]; then
+    printf '%s\n' "${path}"
+  else
+    printf '%s/%s\n' "${ROOT_DIR}" "${path#./}"
+  fi
+}
 
 if [[ -n "${RUNTIME_IMAGE}" ]]; then
   PACKAGE_IMAGE="${RUNTIME_IMAGE}"
@@ -35,6 +54,34 @@ fi
 if ! docker image inspect "${PACKAGE_IMAGE}" >/dev/null 2>&1; then
   echo "Runtime image is not available locally after pull/build: ${PACKAGE_IMAGE}" >&2
   exit 1
+fi
+
+build_service_image() {
+  local name="$1"
+  local dockerfile="$2"
+  local image="$3"
+  local tar_path="$4"
+
+  echo "Building ${name} service image: ${image}"
+  docker build -f "${ROOT_DIR}/${dockerfile}" -t "${image}" "${ROOT_DIR}"
+
+  mkdir -p "$(dirname "${tar_path}")"
+  echo "Saving ${name} service image: ${tar_path}"
+  docker save "${image}" -o "${tar_path}"
+}
+
+if [[ "${ANSIBLE_DNS_TIME_SERVICES_BUILD_IMAGES}" == "true" ]]; then
+  build_service_image \
+    "DNS" \
+    "build/dns-server.Dockerfile" \
+    "${ANSIBLE_DNS_SERVER_IMAGE}" \
+    "$(project_path "${ANSIBLE_DNS_SERVER_IMAGE_TAR}")"
+
+  build_service_image \
+    "time" \
+    "build/time-server.Dockerfile" \
+    "${ANSIBLE_TIME_SERVER_IMAGE}" \
+    "$(project_path "${ANSIBLE_TIME_SERVER_IMAGE_TAR}")"
 fi
 
 rm -rf "${BUNDLE_DIR}"
@@ -98,6 +145,19 @@ Edit \`project/.env\` for the target hosts and SSH settings, then run:
 \`\`\`bash
 ./scripts/run-ansible.sh deploy --syntax-check
 ./scripts/run-ansible.sh deploy
+\`\`\`
+
+Dockerized DNS/time service images are packaged under:
+
+\`\`\`text
+project/repo/docker-images/bind9.tar
+project/repo/docker-images/chrony.tar
+\`\`\`
+
+Run only those services with:
+
+\`\`\`bash
+./scripts/run-ansible.sh deploy --tags dns_time_services
 \`\`\`
 
 The runtime image packaged in this bundle is:

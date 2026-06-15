@@ -71,6 +71,23 @@ zabbix_agent_server_host: "{{ lookup('env', 'ANSIBLE_ZABBIX_SERVER_HOST') | defa
 zabbix_agent_server_active: "{{ lookup('env', 'ANSIBLE_ZABBIX_SERVER_ACTIVE') | default(zabbix_agent_server_host, true) }}"
 zabbix_agent_hostname: "{{ lookup('env', 'ANSIBLE_ZABBIX_AGENT_HOSTNAME') | default(inventory_hostname, true) }}"
 
+# Dockerized DNS and time server role
+dns_time_services_enabled: "{{ (lookup('env', 'ANSIBLE_DNS_TIME_SERVICES_ENABLED') | default('false', true)) | bool }}"
+dns_time_services_target_group: "{{ lookup('env', 'ANSIBLE_DNS_TIME_SERVICES_TARGET_GROUP') | default('dns_time_servers', true) }}"
+dns_time_services_load_images: "{{ (lookup('env', 'ANSIBLE_DNS_TIME_SERVICES_LOAD_IMAGES') | default('true', true)) | bool }}"
+dns_time_services_base_dir: "{{ lookup('env', 'ANSIBLE_DNS_TIME_SERVICES_BASE_DIR') | default('/opt/ansible-dns-time', true) }}"
+dns_server_enabled: "{{ (lookup('env', 'ANSIBLE_DNS_SERVER_ENABLED') | default('true', true)) | bool }}"
+dns_server_image: "{{ lookup('env', 'ANSIBLE_DNS_SERVER_IMAGE') | default('local/bind9:offline', true) }}"
+dns_server_image_tar: "{{ lookup('env', 'ANSIBLE_DNS_SERVER_IMAGE_TAR') | default('./repo/docker-images/bind9.tar', true) }}"
+dns_server_allow_query: "{{ lookup('env', 'ANSIBLE_DNS_SERVER_ALLOW_QUERY') | default('[172.16.0.0/16]', true) | from_yaml }}"
+dns_server_forwarders: "{{ lookup('env', 'ANSIBLE_DNS_SERVER_FORWARDERS') | default('[]', true) | from_yaml }}"
+time_server_enabled: "{{ (lookup('env', 'ANSIBLE_TIME_SERVER_ENABLED') | default('true', true)) | bool }}"
+time_server_image: "{{ lookup('env', 'ANSIBLE_TIME_SERVER_IMAGE') | default('local/chrony:offline', true) }}"
+time_server_image_tar: "{{ lookup('env', 'ANSIBLE_TIME_SERVER_IMAGE_TAR') | default('./repo/docker-images/chrony.tar', true) }}"
+time_server_allow: "{{ lookup('env', 'ANSIBLE_TIME_SERVER_ALLOW') | default('[172.16.0.0/16]', true) | from_yaml }}"
+time_server_upstream_servers: "{{ lookup('env', 'ANSIBLE_TIME_SERVER_UPSTREAM_SERVERS') | default('[]', true) | from_yaml }}"
+time_server_local_stratum: "{{ (lookup('env', 'ANSIBLE_TIME_SERVER_LOCAL_STRATUM') | default('10', true)) | int }}"
+
 # Hostname role
 hostname_manage: "{{ (lookup('env', 'ANSIBLE_HOSTNAME_MANAGE') | default('true', true)) | bool }}"
 hostname_value: "{{ lookup('env', 'ANSIBLE_HOSTNAME_VALUE') | default('ubuntu-proxmox-01-vm', true) }}"
