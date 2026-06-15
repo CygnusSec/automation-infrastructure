@@ -153,6 +153,7 @@ Main variable groups:
 - `dns_server_*`
 - `time_server_*`
 - `ntp_client_*`
+- `external_disk_*`
 
 Common environment variables:
 
@@ -262,7 +263,9 @@ or use the wrapper:
 ```
 
 This installs `ANSIBLE_SSH_COPY_ID_PUBLIC_KEY_FILE` into `authorized_keys` for
-all hosts in `ssh_copy_id_targets`.
+all hosts in `ssh_copy_id_targets`. Relative key paths are resolved from the
+`Ansible/` directory, for example
+`./inventories/customer-a/secrets/id_rsa.pub`.
 
 ### 4. Validate Connectivity
 
@@ -345,8 +348,20 @@ run:
 
 That wrapper temporarily sets `ANSIBLE_SSH_PASSWORD_AUTH=true` so Ansible uses
 the password from `auth.yaml` instead of the private key. After this succeeds,
-normal runs can use `./scripts/run-ansible.sh ssh-copy-id` or
-`./scripts/run-ansible.sh deploy`.
+the wrapper updates `.env` back to key mode:
+
+```env
+ANSIBLE_SSH_PASSWORD_AUTH=false
+ANSIBLE_SSH_COMMON_ARGS=
+ANSIBLE_PASSWORD=
+```
+
+Normal runs then use `ANSIBLE_SSH_PRIVATE_KEY_FILE`, for example:
+
+```bash
+./scripts/run-ansible.sh predeploy-show-info
+./scripts/run-ansible.sh deploy
+```
 
 Check syntax:
 
@@ -500,6 +515,12 @@ Configure NTP clients:
 
 ```bash
 ./scripts/run-ansible.sh deploy --tags ntp_client
+```
+
+Mount external disks:
+
+```bash
+./scripts/run-ansible.sh deploy --tags external_disk
 ```
 
 If you do not use `auth.yaml`, let Ansible prompt for the `sudo` password at runtime:
@@ -667,6 +688,12 @@ repo/docker-images/bind9.tar
 repo/docker-images/chrony.tar
 ```
 
+On the offline control machine, verify the files are present before running:
+
+```bash
+ls -lh repo/docker-images/bind9.tar repo/docker-images/chrony.tar
+```
+
 The normal offline bundle flow creates those tar files automatically:
 
 ```bash
@@ -693,6 +720,8 @@ ANSIBLE_DNS_SERVER_IMAGE=local/bind9:offline
 ANSIBLE_DNS_SERVER_IMAGE_TAR=./repo/docker-images/bind9.tar
 ANSIBLE_DNS_SERVER_ALLOW_QUERY="[172.16.0.0/16]"
 ANSIBLE_DNS_SERVER_FORWARDERS=[]
+ANSIBLE_DNS_SERVER_ZONE_SERIAL=1
+ANSIBLE_DNS_SERVER_ZONES="[{name: bcy.gov.vn, records: [{name: api, type: A, value: 172.16.3.100}, {name: file, type: A, value: 172.16.3.100}, {name: cache, type: A, value: 172.16.3.101}]}]"
 
 ANSIBLE_TIME_SERVER_IMAGE=local/chrony:offline
 ANSIBLE_TIME_SERVER_IMAGE_TAR=./repo/docker-images/chrony.tar
@@ -707,6 +736,22 @@ provide `named` and the time image to provide `chronyd`.
 
 The containers run with host networking so DNS listens on port `53` and the
 time service listens on UDP port `123` on the target host.
+
+Default DNS records:
+
+```text
+api.bcy.gov.vn    A 172.16.3.100
+file.bcy.gov.vn   A 172.16.3.100
+cache.bcy.gov.vn  A 172.16.3.101
+```
+
+Verify DNS lookup from a client:
+
+```bash
+dig @172.16.3.200 api.bcy.gov.vn +short
+dig @172.16.3.200 file.bcy.gov.vn +short
+dig @172.16.3.200 cache.bcy.gov.vn +short
+```
 
 Run only DNS and time services:
 
@@ -748,6 +793,41 @@ This role writes a `systemd-timesyncd` drop-in file on the target hosts:
 It does not install packages during the NTP client run. If a target does not
 have `systemd-timesyncd`, add that package to the offline prerequisite
 repository before running this role.
+
+## External Disk Mounts
+
+Use the `external_disk` role to partition, format, and mount a dedicated data
+disk on selected hosts.
+
+Current target hosts:
+
+```env
+ANSIBLE_EXTERNAL_DISK_HOSTS="172.16.5.57,172.16.4.11,172.16.4.12,172.16.4.13,172.16.4.14,172.16.4.15,172.16.4.16,172.16.4.17,172.16.4.18,172.16.3.28,172.16.3.38"
+```
+
+Disk settings:
+
+```env
+ANSIBLE_EXTERNAL_DISK_ENABLED=true
+ANSIBLE_EXTERNAL_DISK_TARGET_GROUP=external_disk_targets
+ANSIBLE_EXTERNAL_DISK_DEVICE=/dev/sdb
+ANSIBLE_EXTERNAL_DISK_PARTITION=/dev/sdb1
+ANSIBLE_EXTERNAL_DISK_MOUNT_PATH=/mnt/data
+ANSIBLE_EXTERNAL_DISK_FSTYPE=ext4
+ANSIBLE_EXTERNAL_DISK_MOUNT_OPTS=defaults
+ANSIBLE_EXTERNAL_DISK_CREATE_PARTITION=true
+ANSIBLE_EXTERNAL_DISK_FORMAT=true
+```
+
+Run only external disk mounting:
+
+```bash
+./scripts/run-ansible.sh deploy --tags external_disk
+```
+
+The role creates `/dev/sdb1` only when it is missing and formats it only when no
+filesystem exists. It persists the mount in `/etc/fstab` using the partition
+UUID, then mounts `/mnt/data`.
 
 ## Verify After Running
 

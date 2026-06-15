@@ -7,7 +7,9 @@
     - name: Gather facts
       ansible.builtin.setup:
       tags:
-        - always
+        - base
+        - prerequisite
+        - docker
   roles:
     - prerequisite
     - docker
@@ -22,7 +24,7 @@
     - name: Gather facts
       ansible.builtin.setup:
       tags:
-        - always
+        - hostname
   roles:
     - role: hostname
       when: hostname_manage | bool
@@ -37,7 +39,7 @@
     - name: Gather facts
       ansible.builtin.setup:
       tags:
-        - always
+        - network
   roles:
     - role: network
       when: network_manage | bool
@@ -52,7 +54,8 @@
     - name: Gather facts
       ansible.builtin.setup:
       tags:
-        - always
+        - zabbix
+        - zabbix_agent
   roles:
     - role: zabbix_agent
       when: zabbix_agent_enabled | bool
@@ -68,7 +71,9 @@
     - name: Gather facts
       ansible.builtin.setup:
       tags:
-        - always
+        - dns_time_services
+        - dns_server
+        - time_server
   roles:
     - role: dns_time_services
       when: dns_time_services_enabled | bool
@@ -85,12 +90,22 @@
     - name: Gather facts
       ansible.builtin.setup:
       tags:
-        - always
+        - ntp_client
   roles:
     - role: ntp_client
       when: ntp_client_enabled | bool
   tags:
     - ntp_client
+
+- name: Mount external disks
+  hosts: "{{ external_disk_target_group | default('external_disk_targets') }}"
+  gather_facts: false
+  become: true
+  roles:
+    - role: external_disk
+      when: external_disk_enabled | bool
+  tags:
+    - external_disk
 
 - name: Configure Docker Swarm
   hosts: "{{ docker_swarm_target_group | default('swarm_managers:swarm_workers') }}"
@@ -100,7 +115,7 @@
     - name: Gather facts
       ansible.builtin.setup:
       tags:
-        - always
+        - docker_swarm
   roles:
     - role: docker_swarm
       when: docker_swarm_enabled | bool

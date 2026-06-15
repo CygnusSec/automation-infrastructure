@@ -1,0 +1,10 @@
+---
+external_disk_enabled: false
+external_disk_target_group: external_disk_targets
+external_disk_device: /dev/sdb
+external_disk_partition: "{{ external_disk_device }}1"
+external_disk_mount_path: /mnt/data
+external_disk_fstype: ext4
+external_disk_mount_opts: defaults
+external_disk_create_partition: true
+external_disk_format: true

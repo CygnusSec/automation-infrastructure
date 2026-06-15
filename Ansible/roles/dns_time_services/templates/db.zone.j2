@@ -1,0 +1,15 @@
+$TTL 300
+@ IN SOA ns1.{{ zone.name }}. admin.{{ zone.name }}. (
+  {{ dns_server_zone_serial }}
+  300
+  120
+  604800
+  300
+)
+
+@ IN NS ns1.{{ zone.name }}.
+ns1 IN A {{ ansible_host }}
+
+{% for record in zone.records %}
+{{ record.name }} IN {{ record.type | default('A') }} {{ record.value }}
+{% endfor %}

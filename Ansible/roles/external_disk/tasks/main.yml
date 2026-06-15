@@ -1,0 +1,282 @@
+---
+- name: Validate external disk configuration
+  ansible.builtin.assert:
+    that:
+      - external_disk_device is match('^/dev/')
+      - external_disk_partition is match('^/dev/')
+      - external_disk_mount_path is match('^/')
+      - external_disk_fstype | length > 0
+    fail_msg: "Check external disk variables before running this role."
+  tags:
+    - external_disk
+
+- name: Show current block devices
+  ansible.builtin.command: lsblk -f
+  register: external_disk_lsblk
+  changed_when: false
+  tags:
+    - external_disk
+
+- name: Check required disk commands
+  ansible.builtin.command: "command -v {{ item }}"
+  register: external_disk_required_commands
+  changed_when: false
+  loop:
+    - lsblk
+    - blkid
+    - sfdisk
+    - "mkfs.{{ external_disk_fstype }}"
+    - mount
+    - findmnt
+  tags:
+    - external_disk
+
+- name: Check external disk device exists
+  ansible.builtin.stat:
+    path: "{{ external_disk_device }}"
+  register: external_disk_device_stat
+  tags:
+    - external_disk
+
+- name: Fail when external disk device is missing
+  ansible.builtin.fail:
+    msg: >-
+      External disk device {{ external_disk_device }} was not found on
+      {{ inventory_hostname }}. Current devices:
+      {{ external_disk_lsblk.stdout }}
+  when: not external_disk_device_stat.stat.exists
+  tags:
+    - external_disk
+
+- name: Check external disk partition exists
+  ansible.builtin.stat:
+    path: "{{ external_disk_partition }}"
+  register: external_disk_partition_stat
+  tags:
+    - external_disk
+
+- name: Inspect external disk partition layout
+  ansible.builtin.command: lsblk -nr -o TYPE "{{ external_disk_device }}"
+  register: external_disk_layout
+  changed_when: false
+  tags:
+    - external_disk
+
+- name: Fail when disk has an unexpected partition layout
+  ansible.builtin.fail:
+    msg: >-
+      {{ external_disk_device }} already has partitions, but expected partition
+      {{ external_disk_partition }} was not found. Refusing to modify the disk.
+      Current devices: {{ external_disk_lsblk.stdout }}
+  when:
+    - not external_disk_partition_stat.stat.exists
+    - "'part' in external_disk_layout.stdout_lines"
+  tags:
+    - external_disk
+
+- name: Fail when partition is missing and partition creation is disabled
+  ansible.builtin.fail:
+    msg: >-
+      Partition {{ external_disk_partition }} is missing on {{ inventory_hostname }}
+      and external_disk_create_partition=false.
+  when:
+    - not external_disk_partition_stat.stat.exists
+    - not external_disk_create_partition | bool
+  tags:
+    - external_disk
+
+- name: Create single Linux partition on external disk
+  ansible.builtin.command: sfdisk "{{ external_disk_device }}"
+  args:
+    stdin: ",,L\n"
+  when:
+    - not external_disk_partition_stat.stat.exists
+    - external_disk_create_partition | bool
+  register: external_disk_partition_create
+  changed_when: true
+  tags:
+    - external_disk
+
+- name: Ask kernel to reload partition table
+  ansible.builtin.command: partprobe "{{ external_disk_device }}"
+  changed_when: false
+  failed_when: false
+  when: external_disk_partition_create is changed
+  tags:
+    - external_disk
+
+- name: Wait for external disk partition
+  ansible.builtin.stat:
+    path: "{{ external_disk_partition }}"
+  register: external_disk_partition_wait
+  until: external_disk_partition_wait.stat.exists
+  retries: 10
+  delay: 2
+  tags:
+    - external_disk
+
+- name: Check external disk filesystem
+  ansible.builtin.command: blkid -o value -s TYPE "{{ external_disk_partition }}"
+  register: external_disk_fs_type
+  changed_when: false
+  failed_when: false
+  tags:
+    - external_disk
+
+- name: Fail when existing filesystem type is unexpected
+  ansible.builtin.fail:
+    msg: >-
+      Partition {{ external_disk_partition }} already has filesystem
+      {{ external_disk_fs_type.stdout }}, expected {{ external_disk_fstype }}.
+      Refusing to reformat an existing filesystem automatically.
+  when:
+    - external_disk_fs_type.rc == 0
+    - external_disk_fs_type.stdout | trim | length > 0
+    - external_disk_fs_type.stdout | trim != external_disk_fstype
+  tags:
+    - external_disk
+
+- name: Fail when filesystem is missing and formatting is disabled
+  ansible.builtin.fail:
+    msg: >-
+      Partition {{ external_disk_partition }} has no filesystem and
+      external_disk_format=false.
+  when:
+    - external_disk_fs_type.rc != 0
+    - not external_disk_format | bool
+  tags:
+    - external_disk
+
+- name: Format external disk partition
+  ansible.builtin.command: "mkfs.{{ external_disk_fstype }} -F {{ external_disk_partition }}"
+  when:
+    - external_disk_fs_type.rc != 0
+    - external_disk_format | bool
+  changed_when: true
+  tags:
+    - external_disk
+
+- name: Wait for udev after disk changes
+  ansible.builtin.command: udevadm settle
+  changed_when: false
+  failed_when: false
+  tags:
+    - external_disk
+
+- name: Verify external disk filesystem after format
+  ansible.builtin.command: blkid -o value -s TYPE "{{ external_disk_partition }}"
+  register: external_disk_fs_type_verify
+  changed_when: false
+  failed_when: false
+  until:
+    - external_disk_fs_type_verify.rc == 0
+    - external_disk_fs_type_verify.stdout | trim == external_disk_fstype
+  retries: 5
+  delay: 2
+  tags:
+    - external_disk
+
+- name: Get external disk UUID
+  ansible.builtin.command: blkid -o value -s UUID "{{ external_disk_partition }}"
+  register: external_disk_uuid
+  changed_when: false
+  failed_when: false
+  until: external_disk_uuid.stdout | trim | length > 0
+  retries: 5
+  delay: 2
+  tags:
+    - external_disk
+
+- name: Assign UUID to ext4 filesystem when missing
+  ansible.builtin.command: tune2fs -U random "{{ external_disk_partition }}"
+  when:
+    - external_disk_uuid.stdout | trim | length == 0
+    - external_disk_fstype == "ext4"
+  changed_when: true
+  tags:
+    - external_disk
+
+- name: Refresh external disk UUID
+  ansible.builtin.command: blkid -o value -s UUID "{{ external_disk_partition }}"
+  register: external_disk_uuid_refresh
+  changed_when: false
+  failed_when: false
+  when: external_disk_uuid.stdout | trim | length == 0
+  tags:
+    - external_disk
+
+- name: Set effective external disk UUID
+  ansible.builtin.set_fact:
+    external_disk_effective_uuid: >-
+      {{
+        (
+          external_disk_uuid_refresh.stdout
+          if external_disk_uuid_refresh is defined and external_disk_uuid_refresh.stdout | trim | length > 0
+          else external_disk_uuid.stdout
+        ) | trim
+      }}
+  tags:
+    - external_disk
+
+- name: Fail when external disk UUID is missing
+  ansible.builtin.fail:
+    msg: >-
+      Could not determine UUID for {{ external_disk_partition }} on
+      {{ inventory_hostname }}. Refusing to write an invalid /etc/fstab entry.
+      Current devices: {{ external_disk_lsblk.stdout }}
+  when: external_disk_effective_uuid | length == 0
+  tags:
+    - external_disk
+
+- name: Create external disk mount point
+  ansible.builtin.file:
+    path: "{{ external_disk_mount_path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags:
+    - external_disk
+
+- name: Remove invalid empty UUID fstab entry for mount path
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^UUID=\s+{{ external_disk_mount_path }}\s+'
+    state: absent
+    backup: true
+  tags:
+    - external_disk
+
+- name: Persist external disk mount in fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^\S+\s+{{ external_disk_mount_path }}\s+'
+    line: "UUID={{ external_disk_effective_uuid }} {{ external_disk_mount_path }} {{ external_disk_fstype }} {{ external_disk_mount_opts }} 0 2"
+    state: present
+    backup: true
+  register: external_disk_fstab
+  tags:
+    - external_disk
+
+- name: Reload systemd after fstab update
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: external_disk_fstab.changed
+  tags:
+    - external_disk
+
+- name: Mount external disk
+  ansible.builtin.command: mount "{{ external_disk_mount_path }}"
+  register: external_disk_mount
+  changed_when: external_disk_mount.rc == 0
+  failed_when:
+    - external_disk_mount.rc != 0
+    - "'already mounted' not in external_disk_mount.stderr"
+  tags:
+    - external_disk
+
+- name: Verify external disk mount
+  ansible.builtin.command: findmnt "{{ external_disk_mount_path }}"
+  changed_when: false
+  tags:
+    - external_disk

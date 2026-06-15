@@ -8,17 +8,43 @@ dns_time_services_image_dir: "{{ dns_time_services_base_dir }}/images"
 dns_server_enabled: true
 dns_server_image: local/bind9:offline
 dns_server_image_tar: ./repo/docker-images/bind9.tar
+dns_server_image_tar_path: >-
+  {{
+    dns_server_image_tar
+    if dns_server_image_tar.startswith('/')
+    else playbook_dir ~ '/../' ~ dns_server_image_tar
+  }}
 dns_server_container_name: dns-server
 dns_server_config_dir: "{{ dns_time_services_base_dir }}/bind"
+dns_server_cache_dir: "{{ dns_time_services_base_dir }}/bind-cache"
 dns_server_command: "named -g -c /etc/bind/named.conf"
 dns_server_allow_query:
   - 172.16.0.0/16
 dns_server_forwarders: []
 dns_server_extra_options: []
+dns_server_zone_serial: 1
+dns_server_zones:
+  - name: bcy.gov.vn
+    records:
+      - name: api
+        type: A
+        value: 172.16.3.100
+      - name: file
+        type: A
+        value: 172.16.3.100
+      - name: cache
+        type: A
+        value: 172.16.3.101
 
 time_server_enabled: true
 time_server_image: local/chrony:offline
 time_server_image_tar: ./repo/docker-images/chrony.tar
+time_server_image_tar_path: >-
+  {{
+    time_server_image_tar
+    if time_server_image_tar.startswith('/')
+    else playbook_dir ~ '/../' ~ time_server_image_tar
+  }}
 time_server_container_name: time-server
 time_server_config_dir: "{{ dns_time_services_base_dir }}/chrony"
 time_server_command: "chronyd -d -f /etc/chrony/chrony.conf"

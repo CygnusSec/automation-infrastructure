@@ -67,7 +67,7 @@ def connection_vars(become):
 def build_inventory():
     inventory = {
         "_meta": {"hostvars": {}},
-        "all": {"children": ["all_targets", "ssh_copy_id_targets", "linux", "zabbix_agent_targets", "dns_time_servers"]},
+        "all": {"children": ["all_targets", "ssh_copy_id_targets", "linux", "zabbix_agent_targets", "dns_time_servers", "external_disk_targets"]},
     }
 
     manager_hosts = csv_env("ANSIBLE_SWARM_MANAGER_HOSTS", os.environ.get("ANSIBLE_MANAGER_1_HOST", "172.16.5.3"))
@@ -81,6 +81,7 @@ def build_inventory():
     ssh_extra_hosts = csv_env("ANSIBLE_SSH_COPY_ID_EXTRA_HOSTS")
     zabbix_hosts = csv_env("ANSIBLE_ZABBIX_AGENT_HOSTS")
     dns_time_hosts = csv_env("ANSIBLE_DNS_TIME_SERVER_HOSTS")
+    external_disk_hosts = csv_env("ANSIBLE_EXTERNAL_DISK_HOSTS")
 
     if cache_ext_tags and len(cache_ext_tags) != len(cache_ext_hosts):
         warn("ANSIBLE_SWARM_CACHE_SERVER_EXT_TAGS count does not match ANSIBLE_SWARM_CACHE_SERVER_EXT_HOSTS")
@@ -144,6 +145,15 @@ def build_inventory():
         for alias, hostvars in inventory["_meta"]["hostvars"].items()
     }
 
+    for ip in external_disk_hosts:
+        alias = ip_to_alias.get(ip, host_alias("external-disk", ip))
+        add_host(inventory, "external_disk_targets", alias, ip, advertise=False)
+
+    ip_to_alias = {
+        hostvars["ansible_host"]: alias
+        for alias, hostvars in inventory["_meta"]["hostvars"].items()
+    }
+
     for ip in all_target_hosts:
         alias = ip_to_alias.get(ip, host_alias("target", ip))
         add_host(inventory, "all_targets", alias, ip, advertise=False)
@@ -156,6 +166,7 @@ def build_inventory():
     set_group_vars(inventory, "all_targets", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
     set_group_vars(inventory, "zabbix_agent_targets", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
     set_group_vars(inventory, "dns_time_servers", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
+    set_group_vars(inventory, "external_disk_targets", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
     set_group_vars(inventory, "ssh_copy_id_targets", connection_vars(become=False))
 
     return inventory

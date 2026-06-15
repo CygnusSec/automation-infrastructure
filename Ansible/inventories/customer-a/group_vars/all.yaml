@@ -81,6 +81,8 @@ dns_server_image: "{{ lookup('env', 'ANSIBLE_DNS_SERVER_IMAGE') | default('local
 dns_server_image_tar: "{{ lookup('env', 'ANSIBLE_DNS_SERVER_IMAGE_TAR') | default('./repo/docker-images/bind9.tar', true) }}"
 dns_server_allow_query: "{{ lookup('env', 'ANSIBLE_DNS_SERVER_ALLOW_QUERY') | default('[172.16.0.0/16]', true) | from_yaml }}"
 dns_server_forwarders: "{{ lookup('env', 'ANSIBLE_DNS_SERVER_FORWARDERS') | default('[]', true) | from_yaml }}"
+dns_server_zone_serial: "{{ (lookup('env', 'ANSIBLE_DNS_SERVER_ZONE_SERIAL') | default('1', true)) | int }}"
+dns_server_zones: "{{ lookup('env', 'ANSIBLE_DNS_SERVER_ZONES') | default('[{name: bcy.gov.vn, records: [{name: api, type: A, value: 172.16.3.100}, {name: file, type: A, value: 172.16.3.100}, {name: cache, type: A, value: 172.16.3.101}]}]', true) | from_yaml }}"
 time_server_enabled: "{{ (lookup('env', 'ANSIBLE_TIME_SERVER_ENABLED') | default('true', true)) | bool }}"
 time_server_image: "{{ lookup('env', 'ANSIBLE_TIME_SERVER_IMAGE') | default('local/chrony:offline', true) }}"
 time_server_image_tar: "{{ lookup('env', 'ANSIBLE_TIME_SERVER_IMAGE_TAR') | default('./repo/docker-images/chrony.tar', true) }}"
@@ -93,6 +95,17 @@ ntp_client_enabled: "{{ (lookup('env', 'ANSIBLE_NTP_CLIENT_ENABLED') | default('
 ntp_client_target_group: "{{ lookup('env', 'ANSIBLE_NTP_CLIENT_TARGET_GROUP') | default('all_targets:!dns_time_servers', true) }}"
 ntp_client_servers: "{{ lookup('env', 'ANSIBLE_NTP_CLIENT_SERVERS') | default('[172.16.3.200, 172.16.3.201]', true) | from_yaml }}"
 ntp_client_fallback_servers: "{{ lookup('env', 'ANSIBLE_NTP_CLIENT_FALLBACK_SERVERS') | default('[]', true) | from_yaml }}"
+
+# External disk role
+external_disk_enabled: "{{ (lookup('env', 'ANSIBLE_EXTERNAL_DISK_ENABLED') | default('false', true)) | bool }}"
+external_disk_target_group: "{{ lookup('env', 'ANSIBLE_EXTERNAL_DISK_TARGET_GROUP') | default('external_disk_targets', true) }}"
+external_disk_device: "{{ lookup('env', 'ANSIBLE_EXTERNAL_DISK_DEVICE') | default('/dev/sdb', true) }}"
+external_disk_partition: "{{ lookup('env', 'ANSIBLE_EXTERNAL_DISK_PARTITION') | default(external_disk_device ~ '1', true) }}"
+external_disk_mount_path: "{{ lookup('env', 'ANSIBLE_EXTERNAL_DISK_MOUNT_PATH') | default('/mnt/data', true) }}"
+external_disk_fstype: "{{ lookup('env', 'ANSIBLE_EXTERNAL_DISK_FSTYPE') | default('ext4', true) }}"
+external_disk_mount_opts: "{{ lookup('env', 'ANSIBLE_EXTERNAL_DISK_MOUNT_OPTS') | default('defaults', true) }}"
+external_disk_create_partition: "{{ (lookup('env', 'ANSIBLE_EXTERNAL_DISK_CREATE_PARTITION') | default('true', true)) | bool }}"
+external_disk_format: "{{ (lookup('env', 'ANSIBLE_EXTERNAL_DISK_FORMAT') | default('true', true)) | bool }}"
 
 # Hostname role
 hostname_manage: "{{ (lookup('env', 'ANSIBLE_HOSTNAME_MANAGE') | default('true', true)) | bool }}"

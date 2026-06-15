@@ -57,6 +57,18 @@
     - dns_time_services
     - dns_server
 
+- name: Create DNS cache directory
+  ansible.builtin.file:
+    path: "{{ dns_server_cache_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0777"
+  when: dns_server_enabled | bool
+  tags:
+    - dns_time_services
+    - dns_server
+
 - name: Render DNS named.conf
   ansible.builtin.template:
     src: named.conf.j2
@@ -78,6 +90,23 @@
     group: root
     mode: "0644"
   register: dns_server_options_conf
+  when: dns_server_enabled | bool
+  tags:
+    - dns_time_services
+    - dns_server
+
+- name: Render DNS zone files
+  ansible.builtin.template:
+    src: db.zone.j2
+    dest: "{{ dns_server_config_dir }}/db.{{ zone.name }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ dns_server_zones }}"
+  loop_control:
+    loop_var: zone
+    label: "{{ zone.name }}"
+  register: dns_server_zone_files
   when: dns_server_enabled | bool
   tags:
     - dns_time_services
@@ -120,7 +149,7 @@
 
 - name: Validate DNS image tar exists on control
   ansible.builtin.stat:
-    path: "{{ dns_server_image_tar }}"
+    path: "{{ dns_server_image_tar_path }}"
   register: dns_server_image_tar_stat
   delegate_to: localhost
   become: false
@@ -134,7 +163,10 @@
 
 - name: Fail when DNS image tar is missing
   ansible.builtin.fail:
-    msg: "DNS image is missing on target and tar was not found on control: {{ dns_server_image_tar }}"
+    msg: >-
+      DNS image is missing on target and tar was not found on control:
+      {{ dns_server_image_tar_path }}. Build the offline bundle on an online
+      machine or copy the tar file to {{ dns_server_image_tar }}.
   when:
     - dns_server_enabled | bool
     - dns_time_services_load_images | bool
@@ -146,7 +178,7 @@
 
 - name: Copy DNS image tar to target
   ansible.builtin.copy:
-    src: "{{ dns_server_image_tar }}"
+    src: "{{ dns_server_image_tar_path }}"
     dest: "{{ dns_time_services_image_dir }}/bind9.tar"
     owner: root
     group: root
@@ -185,7 +217,7 @@
   ansible.builtin.fail:
     msg: >-
       DNS Docker image {{ dns_server_image }} is not available on target after
-      offline image loading. Check that {{ dns_server_image_tar }} exists on
+      offline image loading. Check that {{ dns_server_image_tar_path }} exists on
       the control machine and contains the same image tag.
   when:
     - dns_server_enabled | bool
@@ -206,7 +238,7 @@
 
 - name: Validate time image tar exists on control
   ansible.builtin.stat:
-    path: "{{ time_server_image_tar }}"
+    path: "{{ time_server_image_tar_path }}"
   register: time_server_image_tar_stat
   delegate_to: localhost
   become: false
@@ -220,7 +252,10 @@
 
 - name: Fail when time image tar is missing
   ansible.builtin.fail:
-    msg: "Time server image is missing on target and tar was not found on control: {{ time_server_image_tar }}"
+    msg: >-
+      Time server image is missing on target and tar was not found on control:
+      {{ time_server_image_tar_path }}. Build the offline bundle on an online
+      machine or copy the tar file to {{ time_server_image_tar }}.
   when:
     - time_server_enabled | bool
     - dns_time_services_load_images | bool
@@ -232,7 +267,7 @@
 
 - name: Copy time image tar to target
   ansible.builtin.copy:
-    src: "{{ time_server_image_tar }}"
+    src: "{{ time_server_image_tar_path }}"
     dest: "{{ dns_time_services_image_dir }}/chrony.tar"
     owner: root
     group: root
@@ -271,7 +306,7 @@
   ansible.builtin.fail:
     msg: >-
       Time server Docker image {{ time_server_image }} is not available on
-      target after offline image loading. Check that {{ time_server_image_tar }}
+      target after offline image loading. Check that {{ time_server_image_tar_path }}
       exists on the control machine and contains the same image tag.
   when:
     - time_server_enabled | bool
@@ -290,6 +325,21 @@
     - dns_time_services
     - dns_server
 
+- name: Check DNS container cache mount
+  ansible.builtin.command: >
+    docker inspect
+    --format {% raw %}'{{ range .Mounts }}{{ if eq .Destination "/var/cache/bind" }}{{ .Source }}{{ end }}{{ end }}'{% endraw %}
+    "{{ dns_server_container_name }}"
+  register: dns_server_cache_mount_check
+  changed_when: false
+  failed_when: false
+  when:
+    - dns_server_enabled | bool
+    - dns_server_container_check.rc == 0
+  tags:
+    - dns_time_services
+    - dns_server
+
 - name: Recreate DNS container when needed
   ansible.builtin.command: docker rm -f "{{ dns_server_container_name }}"
   changed_when: true
@@ -297,7 +347,7 @@
   when:
     - dns_server_enabled | bool
     - dns_server_container_check.rc == 0
-    - dns_server_named_conf.changed or dns_server_options_conf.changed or (dns_server_image_load is defined and dns_server_image_load.changed)
+    - dns_server_named_conf.changed or dns_server_options_conf.changed or dns_server_zone_files.changed or (dns_server_image_load is defined and dns_server_image_load.changed) or (dns_server_cache_mount_check is defined and dns_server_cache_mount_check.stdout != dns_server_cache_dir)
   tags:
     - dns_time_services
     - dns_server
@@ -310,6 +360,7 @@
     --network host
     --pull never
     -v {{ dns_server_config_dir }}:/etc/bind:ro
+    -v {{ dns_server_cache_dir }}:/var/cache/bind
     {{ dns_server_image }}
     {{ dns_server_command }}
   args:
@@ -317,7 +368,7 @@
   changed_when: true
   when:
     - dns_server_enabled | bool
-    - dns_server_container_check.rc != 0 or dns_server_named_conf.changed or dns_server_options_conf.changed or (dns_server_image_load is defined and dns_server_image_load.changed)
+    - dns_server_container_check.rc != 0 or dns_server_named_conf.changed or dns_server_options_conf.changed or dns_server_zone_files.changed or (dns_server_image_load is defined and dns_server_image_load.changed) or (dns_server_cache_mount_check is defined and dns_server_cache_mount_check.stdout != dns_server_cache_dir)
   tags:
     - dns_time_services
     - dns_server
