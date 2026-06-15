@@ -77,6 +77,21 @@
     - dns_server
     - time_server
 
+- name: Configure NTP clients
+  hosts: "{{ ntp_client_target_group | default('all_targets:!dns_time_servers') }}"
+  gather_facts: false
+  become: true
+  pre_tasks:
+    - name: Gather facts
+      ansible.builtin.setup:
+      tags:
+        - always
+  roles:
+    - role: ntp_client
+      when: ntp_client_enabled | bool
+  tags:
+    - ntp_client
+
 - name: Configure Docker Swarm
   hosts: "{{ docker_swarm_target_group | default('swarm_managers:swarm_workers') }}"
   gather_facts: false

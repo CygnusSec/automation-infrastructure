@@ -152,6 +152,7 @@ Main variable groups:
 - `dns_time_services_*`
 - `dns_server_*`
 - `time_server_*`
+- `ntp_client_*`
 
 Common environment variables:
 
@@ -495,6 +496,12 @@ Create or join Docker Swarm:
 ./scripts/run-ansible.sh deploy --tags docker_swarm
 ```
 
+Configure NTP clients:
+
+```bash
+./scripts/run-ansible.sh deploy --tags ntp_client
+```
+
 If you do not use `auth.yaml`, let Ansible prompt for the `sudo` password at runtime:
 
 ```bash
@@ -713,6 +720,34 @@ Run only one side:
 ./scripts/run-ansible.sh deploy --tags dns_server
 ./scripts/run-ansible.sh deploy --tags time_server
 ```
+
+## NTP Clients
+
+After the time server containers are running on `172.16.3.200` and
+`172.16.3.201`, configure the remaining servers as NTP clients:
+
+```env
+ANSIBLE_NTP_CLIENT_ENABLED=true
+ANSIBLE_NTP_CLIENT_TARGET_GROUP=all_targets:!dns_time_servers
+ANSIBLE_NTP_CLIENT_SERVERS="[172.16.3.200, 172.16.3.201]"
+ANSIBLE_NTP_CLIENT_FALLBACK_SERVERS=[]
+```
+
+Run only NTP client configuration:
+
+```bash
+./scripts/run-ansible.sh deploy --tags ntp_client
+```
+
+This role writes a `systemd-timesyncd` drop-in file on the target hosts:
+
+```text
+/etc/systemd/timesyncd.conf.d/10-ansible-ntp.conf
+```
+
+It does not install packages during the NTP client run. If a target does not
+have `systemd-timesyncd`, add that package to the offline prerequisite
+repository before running this role.
 
 ## Verify After Running
 

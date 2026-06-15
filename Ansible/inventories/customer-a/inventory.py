@@ -135,6 +135,15 @@ def build_inventory():
         for alias, hostvars in inventory["_meta"]["hostvars"].items()
     }
 
+    for ip in dns_time_hosts:
+        alias = ip_to_alias.get(ip, host_alias("dns-time", ip))
+        add_host(inventory, "dns_time_servers", alias, ip, advertise=False)
+
+    ip_to_alias = {
+        hostvars["ansible_host"]: alias
+        for alias, hostvars in inventory["_meta"]["hostvars"].items()
+    }
+
     for ip in all_target_hosts:
         alias = ip_to_alias.get(ip, host_alias("target", ip))
         add_host(inventory, "all_targets", alias, ip, advertise=False)
@@ -143,11 +152,8 @@ def build_inventory():
         alias = ip_to_alias.get(ip, host_alias("zabbix-agent", ip))
         add_host(inventory, "zabbix_agent_targets", alias, ip, advertise=False)
 
-    for ip in dns_time_hosts:
-        alias = ip_to_alias.get(ip, host_alias("dns-time", ip))
-        add_host(inventory, "dns_time_servers", alias, ip, advertise=False)
-
     set_group_vars(inventory, "linux", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
+    set_group_vars(inventory, "all_targets", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
     set_group_vars(inventory, "zabbix_agent_targets", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
     set_group_vars(inventory, "dns_time_servers", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
     set_group_vars(inventory, "ssh_copy_id_targets", connection_vars(become=False))

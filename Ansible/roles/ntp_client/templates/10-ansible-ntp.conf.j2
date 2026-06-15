@@ -1,0 +1,7 @@
+[Time]
+NTP={{ ntp_client_servers | join(' ') }}
+{% if ntp_client_fallback_servers | length > 0 %}
+FallbackNTP={{ ntp_client_fallback_servers | join(' ') }}
+{% else %}
+FallbackNTP=
+{% endif %}
