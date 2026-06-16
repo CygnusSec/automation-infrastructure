@@ -1,0 +1,31 @@
+options {
+  directory "/var/cache/bind";
+
+  recursion yes;
+  allow-query {
+{% for cidr in dns_server_allow_query %}
+    {{ cidr }};
+{% endfor %}
+  };
+  allow-recursion {
+{% for cidr in dns_server_allow_query %}
+    {{ cidr }};
+{% endfor %}
+  };
+
+{% if dns_server_forwarders | length > 0 %}
+  forwarders {
+{% for server in dns_server_forwarders %}
+    {{ server }};
+{% endfor %}
+  };
+{% endif %}
+
+  listen-on port 53 { any; };
+  listen-on-v6 { none; };
+  dnssec-validation auto;
+
+{% for option in dns_server_extra_options %}
+  {{ option }}
+{% endfor %}
+};

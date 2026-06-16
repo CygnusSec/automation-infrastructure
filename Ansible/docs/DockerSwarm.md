@@ -28,10 +28,10 @@ Split Swarm nodes into two groups:
 
 ```ini
 [swarm_managers]
-192.168.1.143
+manager-01 ansible_host=<manager-ip>
 
 [swarm_workers]
-192.168.1.144
+worker-01 ansible_host=<worker-ip>
 
 [linux:children]
 swarm_managers
@@ -77,12 +77,12 @@ Example:
 
 ```yaml
 docker_swarm_enabled: true
-docker_swarm_listen_addr: "0.0.0.0:2377"
+docker_swarm_listen_addr: "<listen-ip>:2377"
 docker_swarm_port: 2377
 docker_swarm_force_reset: false
 docker_swarm_manager_addr: ""
 docker_swarm_manage_iptables: true
-docker_swarm_iptables_source_cidr: "0.0.0.0/0"
+docker_swarm_iptables_source_cidr: "<source-cidr>"
 docker_swarm_manage_encrypted_overlay_esp: false
 docker_swarm_service_ports:
   - port: 80
@@ -94,10 +94,10 @@ per host in the inventory:
 
 ```ini
 [swarm_managers]
-manager-1 ansible_host=192.168.1.143 docker_swarm_advertise_addr=192.168.1.143
+manager-1 ansible_host=<manager-ip> docker_swarm_advertise_addr=<manager-ip>
 
 [swarm_workers]
-worker-1 ansible_host=192.168.1.144 docker_swarm_advertise_addr=192.168.1.144
+worker-1 ansible_host=<worker-ip> docker_swarm_advertise_addr=<worker-ip>
 ```
 
 If `docker_swarm_advertise_addr` is not defined, the role can fall back to:
@@ -158,7 +158,7 @@ Sample content for one primary manager and multiple workers:
   ansible.builtin.command: >
     docker swarm init
     --advertise-addr {{ docker_swarm_advertise_addr | default(ansible_host | default(inventory_hostname)) }}
-    --listen-addr {{ docker_swarm_listen_addr | default('0.0.0.0:2377') }}
+    --listen-addr {{ docker_swarm_listen_addr }}
   when:
     - docker_swarm_enabled | default(true) | bool
     - inventory_hostname == groups['swarm_managers'][0]
@@ -280,7 +280,7 @@ The role can create the required iptables rules automatically:
 
 ```yaml
 docker_swarm_manage_iptables: true
-docker_swarm_iptables_source_cidr: "0.0.0.0/0"
+docker_swarm_iptables_source_cidr: "<source-cidr>"
 docker_swarm_manage_encrypted_overlay_esp: false
 ```
 

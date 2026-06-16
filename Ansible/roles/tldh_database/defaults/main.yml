@@ -1,0 +1,37 @@
+---
+tldh_database_enabled: false
+tldh_database_target_group: tldh_database_targets
+tldh_database_master_group: tldh_database_masters
+tldh_database_slave_group: tldh_database_slaves
+
+tldh_database_base_dir: /opt/tldh-data
+tldh_database_config_dir: "{{ tldh_database_base_dir }}/config"
+tldh_database_data_dir: /mnt/data/mysql
+tldh_database_compose_file: "{{ tldh_database_base_dir }}/docker-compose.yml"
+
+tldh_database_image: registry.bcy.gov.vn/tldh/mariadb:10.7
+tldh_database_image_tar: ""
+tldh_database_load_image: false
+tldh_database_image_tar_dest: "{{ tldh_database_base_dir }}/images/mariadb.tar"
+tldh_database_container_name_prefix: TLDH-Database-production
+tldh_database_container_name: "{{ tldh_database_container_name_prefix }}-{{ 'Master' if tldh_database_role == 'master' else 'Slave' }}"
+
+tldh_database_root_password: ""
+tldh_database_app_user: ""
+tldh_database_app_password: ""
+tldh_database_root_host: "%"
+tldh_database_replication_user: replica
+tldh_database_replication_password: ""
+tldh_database_master_host: ""
+tldh_database_master_port: 3306
+
+tldh_database_master_server_id: 1
+tldh_database_slave_server_id: 2
+tldh_database_server_id: "{{ tldh_database_master_server_id if tldh_database_role == 'master' else tldh_database_slave_server_id }}"
+
+tldh_database_cpu_limit: "14"
+tldh_database_memory_limit: 24G
+tldh_database_cpu_reservation: "8"
+tldh_database_memory_reservation: 16G
+tldh_database_nofile_soft: 100000
+tldh_database_nofile_hard: 100000

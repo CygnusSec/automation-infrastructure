@@ -16,22 +16,33 @@ if [[ $# -lt 1 ]]; then
 fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ENV_FILE="${ROOT_DIR}/.env"
 REQUESTED_PLAYBOOK="$1"
 
-if [[ -f "${ENV_FILE}" ]]; then
-  set -a
-  # shellcheck disable=SC1090
-  source "${ENV_FILE}"
-  set +a
-fi
+# shellcheck source=scripts/lib/env.sh
+source "${ROOT_DIR}/scripts/lib/env.sh"
+load_ansible_env "${ROOT_DIR}" "${@:2}"
 
 DEFAULT_ANSIBLE_IMAGE="ansible-base-runtime:local"
 LOCAL_RUNTIME_IMAGE="${LOCAL_RUNTIME_IMAGE:-${DEFAULT_ANSIBLE_IMAGE}}"
 RUNTIME_IMAGE="${RUNTIME_IMAGE:-}"
 ANSIBLE_CONTROL_OFFLINE="${ANSIBLE_CONTROL_OFFLINE:-false}"
-ANSIBLE_SSH_PASSWORD_AUTH="${ANSIBLE_SSH_PASSWORD_AUTH_OVERRIDE:-${ANSIBLE_SSH_PASSWORD_AUTH:-false}}"
-export ANSIBLE_SSH_PASSWORD_AUTH
+ANSIBLE_SSH_USER="${ANSIBLE_SSH_USER:-bcy_admin}"
+export ANSIBLE_SSH_USER
+
+if [[ "${RUNTIME_IMAGE}" == *.tar || "${RUNTIME_IMAGE}" == *.tar.gz ]]; then
+  echo "Ignoring RUNTIME_IMAGE tar path while running Ansible: ${RUNTIME_IMAGE}" >&2
+  echo "Load runtime image tars with ./scripts/prepare-offline-control.sh, then use LOCAL_RUNTIME_IMAGE." >&2
+  RUNTIME_IMAGE=""
+fi
+
+resolve_project_path() {
+  local path="$1"
+  if [[ "${path}" = /* ]]; then
+    printf '%s\n' "${path}"
+  else
+    printf '%s/%s\n' "${ROOT_DIR}" "${path#./}"
+  fi
+}
 
 if [[ -n "${RUNTIME_IMAGE}" ]]; then
   ANSIBLE_IMAGE="${RUNTIME_IMAGE}"
@@ -85,12 +96,57 @@ if [[ -z "${PLAYBOOK_PATH}" ]]; then
   exit 1
 fi
 
+PRIVATE_KEY_PATH="$(resolve_project_path "${ANSIBLE_SSH_PRIVATE_KEY_FILE:-./inventories/customer-a/secrets/id_rsa}")"
+if [[ -n "${ANSIBLE_SSH_PASSWORD_AUTH_OVERRIDE:-}" ]]; then
+  ANSIBLE_SSH_PASSWORD_AUTH="${ANSIBLE_SSH_PASSWORD_AUTH_OVERRIDE}"
+elif [[ "${PLAYBOOK_PATH}" == "playbooks/ssh-copy-id."* ]]; then
+  ANSIBLE_SSH_PASSWORD_AUTH="true"
+elif [[ -f "${PRIVATE_KEY_PATH}" ]]; then
+  ANSIBLE_SSH_PASSWORD_AUTH="false"
+else
+  ANSIBLE_SSH_PASSWORD_AUTH="true"
+fi
+export ANSIBLE_SSH_PASSWORD_AUTH
+
+if [[ "${ANSIBLE_SSH_PASSWORD_AUTH}" == "true" ]]; then
+  if [[ "${PLAYBOOK_PATH}" == "playbooks/ssh-copy-id."* ]]; then
+    echo "WARNING: using SSH password auth only to bootstrap/copy the public key." >&2
+    echo "After this succeeds, run deploy normally; the wrapper will use the private key when it exists: ${PRIVATE_KEY_PATH}" >&2
+  elif [[ -f "${PRIVATE_KEY_PATH}" && -n "${ANSIBLE_SSH_PASSWORD_AUTH_OVERRIDE:-}" ]]; then
+    echo "WARNING: password auth was forced even though a private key exists: ${PRIVATE_KEY_PATH}" >&2
+  else
+    echo "WARNING: SSH private key not found at ${PRIVATE_KEY_PATH}; falling back to password auth." >&2
+    echo "Run ./scripts/run-ansible.sh ssh-copy-id after creating/copying the key, then deploy with key auth." >&2
+  fi
+  ANSIBLE_SSH_COMMON_ARGS="${ANSIBLE_SSH_COMMON_ARGS:--o PubkeyAuthentication=no -o PreferredAuthentications=password}"
+  export ANSIBLE_SSH_COMMON_ARGS
+  if [[ -z "${ANSIBLE_PASSWORD:-}" ]]; then
+    echo "ERROR: password auth is required for this run, but ANSIBLE_PASSWORD is empty." >&2
+    echo "Set ANSIBLE_PASSWORD in .env for bootstrap, or create ${PRIVATE_KEY_PATH} and rerun to use key auth." >&2
+    exit 1
+  fi
+fi
+
 INVENTORY_SECRET_VARS_RELATIVE="${ANSIBLE_INVENTORY_SECRET_VARS:-inventories/customer-a/secrets/auth.yaml}"
 INVENTORY_SECRET_VARS="${ROOT_DIR}/${INVENTORY_SECRET_VARS_RELATIVE}"
 EXTRA_ARGS=()
 DOCKER_ENV_ARGS=(
   "-e" "ANSIBLE_SSH_PASSWORD_AUTH=${ANSIBLE_SSH_PASSWORD_AUTH}"
 )
+
+while IFS='=' read -r env_name _; do
+  case "${env_name}" in
+    ANSIBLE_*)
+      DOCKER_ENV_ARGS+=("-e" "${env_name}=${!env_name}")
+      ;;
+  esac
+done < <(env | sort)
+
+# Set ANSIBLE_REMOTE_USER (Ansible built-in) so Ansible never falls back to
+# the container's OS user (root) when group_vars somehow fail to apply.
+if [[ -n "${ANSIBLE_SSH_USER:-}" ]]; then
+  DOCKER_ENV_ARGS+=("-e" "ANSIBLE_REMOTE_USER=${ANSIBLE_SSH_USER}")
+fi
 
 if [[ "${ANSIBLE_SSH_PASSWORD_AUTH}" == "true" && -n "${ANSIBLE_SSH_COMMON_ARGS:-}" ]]; then
   DOCKER_ENV_ARGS+=("-e" "ANSIBLE_SSH_COMMON_ARGS=${ANSIBLE_SSH_COMMON_ARGS}")
@@ -100,12 +156,18 @@ if [[ -f "${INVENTORY_SECRET_VARS}" ]]; then
   EXTRA_ARGS+=("-e" "@${INVENTORY_SECRET_VARS_RELATIVE}")
 fi
 
-if [[ -n "${ANSIBLE_PASSWORD:-}" ]]; then
+if [[ "${ANSIBLE_SSH_PASSWORD_AUTH}" == "true" && -n "${ANSIBLE_PASSWORD:-}" ]]; then
   EXTRA_ARGS+=("-e" "ansible_password=${ANSIBLE_PASSWORD}")
 fi
 
 if [[ -n "${ANSIBLE_BECOME_PASSWORD:-}" ]]; then
   EXTRA_ARGS+=("-e" "ansible_become_password=${ANSIBLE_BECOME_PASSWORD}")
+fi
+
+# Force ansible_user via extra-vars (highest priority) to guarantee the
+# correct SSH user regardless of inventory/config state inside the container.
+if [[ -n "${ANSIBLE_SSH_USER:-}" ]]; then
+  EXTRA_ARGS+=("-e" "ansible_user=${ANSIBLE_SSH_USER}")
 fi
 
 if ! docker image inspect "${ANSIBLE_IMAGE}" >/dev/null 2>&1; then
@@ -119,10 +181,36 @@ if ! docker image inspect "${ANSIBLE_IMAGE}" >/dev/null 2>&1; then
   if [[ "${USE_REGISTRY_IMAGE}" -eq 1 ]]; then
     docker pull "${ANSIBLE_IMAGE}"
   else
-    RUNTIME_IMAGE="${ANSIBLE_IMAGE}" LOCAL_RUNTIME_IMAGE="${LOCAL_RUNTIME_IMAGE}" \
+    ANSIBLE_IMAGE="${ANSIBLE_IMAGE}" LOCAL_RUNTIME_IMAGE="${LOCAL_RUNTIME_IMAGE}" \
       docker compose -f "${ROOT_DIR}/docker-compose.yaml" build ansible
   fi
 fi
 
-RUNTIME_IMAGE="${ANSIBLE_IMAGE}" LOCAL_RUNTIME_IMAGE="${LOCAL_RUNTIME_IMAGE}" \
+# Pre-flight check: verify at least one inventory host variable is loaded.
+# Any non-empty host var from 10-inventory.env proves the env was sourced.
+_preflight_has_hosts="false"
+for _pf_var in ANSIBLE_SWARM_MANAGER_HOSTS ANSIBLE_ALL_TARGET_HOSTS \
+               ANSIBLE_ZABBIX_AGENT_HOSTS ANSIBLE_DNS_TIME_SERVER_HOSTS \
+               ANSIBLE_EXTERNAL_DISK_HOSTS ANSIBLE_TLDH_DATABASE_MASTER_HOST; do
+  if [[ -n "${!_pf_var:-}" ]]; then
+    _preflight_has_hosts="true"
+    break
+  fi
+done
+
+if [[ "${_preflight_has_hosts}" == "false" ]]; then
+  echo "" >&2
+  echo "ERROR: All inventory host variables are empty." >&2
+  echo "env.d/10-inventory.env was not loaded or contains no host definitions." >&2
+  echo "Ansible will not find any hosts to target." >&2
+  echo "" >&2
+  echo "Troubleshooting:" >&2
+  echo "  1. Verify env.d/10-inventory.env exists and contains host definitions" >&2
+  echo "  2. Run: source scripts/lib/env.sh && load_ansible_env \"\$(pwd)\" && echo \"\${ANSIBLE_SWARM_MANAGER_HOSTS}\"" >&2
+  echo "  3. On the server, check file permissions: ls -la env.d/10-inventory.env" >&2
+  echo "" >&2
+  exit 1
+fi
+
+ANSIBLE_IMAGE="${ANSIBLE_IMAGE}" LOCAL_RUNTIME_IMAGE="${LOCAL_RUNTIME_IMAGE}" \
   docker compose -f "${ROOT_DIR}/docker-compose.yaml" run --rm "${DOCKER_ENV_ARGS[@]}" ansible ansible-playbook "${PLAYBOOK_PATH}" "${EXTRA_ARGS[@]}" "${@:2}"

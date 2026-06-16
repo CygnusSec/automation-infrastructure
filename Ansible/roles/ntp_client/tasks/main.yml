@@ -1,0 +1,61 @@
+---
+- name: Validate NTP client configuration
+  ansible.builtin.assert:
+    that:
+      - ntp_client_servers | length > 0
+    fail_msg: "Set at least one NTP server in ANSIBLE_NTP_CLIENT_SERVERS."
+  tags:
+    - ntp_client
+
+- name: Check systemd-timesyncd is available
+  ansible.builtin.command: systemctl status "{{ ntp_client_service_name }}"
+  register: ntp_client_service_check
+  changed_when: false
+  failed_when: false
+  tags:
+    - ntp_client
+
+- name: Fail when systemd-timesyncd is unavailable
+  ansible.builtin.fail:
+    msg: >-
+      {{ ntp_client_service_name }} is not available on {{ inventory_hostname }}.
+      Install/enable systemd-timesyncd on the target first, or add its package
+      to the offline prerequisite repository.
+  when: ntp_client_service_check.rc == 4
+  tags:
+    - ntp_client
+
+- name: Create systemd-timesyncd drop-in directory
+  ansible.builtin.file:
+    path: "{{ ntp_client_conf_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags:
+    - ntp_client
+
+- name: Configure NTP client servers
+  ansible.builtin.template:
+    src: 10-ansible-ntp.conf.j2
+    dest: "{{ ntp_client_conf_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart systemd-timesyncd
+  tags:
+    - ntp_client
+
+- name: Enable NTP synchronization
+  ansible.builtin.command: timedatectl set-ntp true
+  changed_when: false
+  tags:
+    - ntp_client
+
+- name: Enable and start systemd-timesyncd
+  ansible.builtin.systemd:
+    name: "{{ ntp_client_service_name }}"
+    enabled: true
+    state: started
+  tags:
+    - ntp_client

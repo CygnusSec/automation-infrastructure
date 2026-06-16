@@ -1,0 +1,37 @@
+---
+- name: Stop Zabbix agent services before uninstall
+  become: true
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  loop: "{{ zabbix_agent_uninstall_services }}"
+  register: zabbix_agent_stop_result
+  failed_when: false
+  tags:
+    - zabbix
+    - zabbix_agent
+    - zabbix_agent_uninstall
+
+- name: Uninstall Zabbix agent packages
+  become: true
+  ansible.builtin.apt:
+    name: "{{ zabbix_agent_uninstall_packages }}"
+    state: absent
+    purge: "{{ zabbix_agent_uninstall_purge | bool }}"
+    autoremove: "{{ zabbix_agent_uninstall_autoremove | bool }}"
+  tags:
+    - zabbix
+    - zabbix_agent
+    - zabbix_agent_uninstall
+
+- name: Remove copied Zabbix local repository
+  become: true
+  ansible.builtin.file:
+    path: "{{ zabbix_agent_repo_dest }}"
+    state: absent
+  when: zabbix_agent_uninstall_remove_local_repo | bool
+  tags:
+    - zabbix
+    - zabbix_agent
+    - zabbix_agent_uninstall

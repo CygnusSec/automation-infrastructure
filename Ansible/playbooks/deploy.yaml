@@ -7,7 +7,9 @@
     - name: Gather facts
       ansible.builtin.setup:
       tags:
-        - always
+        - base
+        - prerequisite
+        - docker
   roles:
     - prerequisite
     - docker
@@ -22,7 +24,7 @@
     - name: Gather facts
       ansible.builtin.setup:
       tags:
-        - always
+        - hostname
   roles:
     - role: hostname
       when: hostname_manage | bool
@@ -37,7 +39,7 @@
     - name: Gather facts
       ansible.builtin.setup:
       tags:
-        - always
+        - network
   roles:
     - role: network
       when: network_manage | bool
@@ -45,14 +47,15 @@
     - network
 
 - name: Configure Zabbix agents
-  hosts: "{{ zabbix_agent_target_group | default('linux') }}"
+  hosts: "{{ lookup('env', 'ANSIBLE_ZABBIX_AGENT_TARGET_GROUP') | default('zabbix_agent_targets', true) }}"
   gather_facts: false
   become: true
   pre_tasks:
     - name: Gather facts
       ansible.builtin.setup:
       tags:
-        - always
+        - zabbix
+        - zabbix_agent
   roles:
     - role: zabbix_agent
       when: zabbix_agent_enabled | bool
@@ -60,17 +63,135 @@
     - zabbix
     - zabbix_agent
 
-- name: Configure Docker Swarm
-  hosts: "{{ docker_swarm_target_group | default('swarm_managers:swarm_workers') }}"
+- name: Uninstall Zabbix agents
+  hosts: "{{ lookup('env', 'ANSIBLE_ZABBIX_AGENT_TARGET_GROUP') | default('zabbix_agent_targets', true) }}"
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Uninstall Zabbix agent packages
+      ansible.builtin.include_role:
+        name: zabbix_agent
+        tasks_from: uninstall
+        apply:
+          become: true
+      tags:
+        - zabbix_agent_uninstall
+  tags:
+    - zabbix_agent_uninstall
+
+- name: Remove native MariaDB server package
+  hosts: "{{ lookup('env', 'ANSIBLE_MARIADB_REMOVE_TARGET_GROUP') | default('all_targets', true) }}"
+  gather_facts: false
+  become: true
+  vars:
+    mariadb_remove_packages: "{{ lookup('env', 'ANSIBLE_MARIADB_REMOVE_PACKAGES') | default('[mariadb-server]', true) | from_yaml }}"
+    mariadb_remove_services: "{{ lookup('env', 'ANSIBLE_MARIADB_REMOVE_SERVICES') | default('[mariadb, mysql]', true) | from_yaml }}"
+    mariadb_remove_purge: "{{ (lookup('env', 'ANSIBLE_MARIADB_REMOVE_PURGE') | default('true', true)) | bool }}"
+    mariadb_remove_autoremove: "{{ (lookup('env', 'ANSIBLE_MARIADB_REMOVE_AUTOREMOVE') | default('true', true)) | bool }}"
+  tasks:
+    - name: Stop native MariaDB services before package removal
+      become: true
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+      loop: "{{ mariadb_remove_services }}"
+      failed_when: false
+      tags:
+        - mariadb_remove
+
+    - name: Remove native MariaDB packages
+      become: true
+      ansible.builtin.apt:
+        name: "{{ mariadb_remove_packages }}"
+        state: absent
+        purge: "{{ mariadb_remove_purge }}"
+        autoremove: "{{ mariadb_remove_autoremove }}"
+      tags:
+        - mariadb_remove
+  tags:
+    - mariadb_remove
+
+- name: Configure Dockerized DNS and time servers
+  hosts: "{{ lookup('env', 'ANSIBLE_DNS_TIME_SERVICES_TARGET_GROUP') | default('dns_time_servers', true) }}"
   gather_facts: false
   become: true
   pre_tasks:
     - name: Gather facts
       ansible.builtin.setup:
       tags:
-        - always
+        - dns_time_services
+        - dns_server
+        - time_server
+  roles:
+    - role: dns_time_services
+      when: dns_time_services_enabled | bool
+  tags:
+    - dns_time_services
+    - dns_server
+    - time_server
+
+- name: Configure NTP clients
+  hosts: "{{ lookup('env', 'ANSIBLE_NTP_CLIENT_TARGET_GROUP') | default('all_targets:!dns_time_servers', true) }}"
+  gather_facts: false
+  become: true
+  pre_tasks:
+    - name: Gather facts
+      ansible.builtin.setup:
+      tags:
+        - ntp_client
+  roles:
+    - role: ntp_client
+      when: ntp_client_enabled | bool
+  tags:
+    - ntp_client
+
+- name: Deploy TLDH database
+  hosts: "{{ lookup('env', 'ANSIBLE_TLDH_DATABASE_TARGET_GROUP') | default('tldh_database_targets', true) }}"
+  gather_facts: false
+  become: true
+  roles:
+    - role: tldh_database
+      when: tldh_database_enabled | bool
+  tags:
+    - tldh_database
+
+- name: Mount external disks
+  hosts: "{{ lookup('env', 'ANSIBLE_EXTERNAL_DISK_TARGET_GROUP') | default('external_disk_targets', true) }}"
+  gather_facts: false
+  become: true
+  roles:
+    - role: external_disk
+      when: external_disk_enabled | bool
+  tags:
+    - external_disk
+
+- name: Configure Docker Swarm
+  hosts: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_TARGET_GROUP') | default('swarm_managers:swarm_workers', true) }}"
+  gather_facts: false
+  become: true
+  pre_tasks:
+    - name: Gather facts
+      ansible.builtin.setup:
+      tags:
+        - docker_swarm
   roles:
     - role: docker_swarm
       when: docker_swarm_enabled | bool
   tags:
     - docker_swarm
+
+- name: Configure Docker Swarm iptables
+  hosts: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_TARGET_GROUP') | default('swarm_managers:swarm_workers', true) }}"
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Configure Docker Swarm iptables rules
+      ansible.builtin.include_role:
+        name: docker_swarm
+        tasks_from: iptables
+      when: docker_swarm_manage_iptables | bool
+      tags:
+        - docker_swarm_iptables
+  tags:
+    - docker_swarm_iptables

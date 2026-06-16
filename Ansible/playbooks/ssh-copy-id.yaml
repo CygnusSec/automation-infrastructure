@@ -3,6 +3,13 @@
   hosts: "{{ ssh_copy_id_target_group | default('ssh_copy_id_targets') }}"
   gather_facts: false
   become: false
+  vars:
+    ssh_copy_id_public_key_path: >-
+      {{
+        ssh_copy_id_public_key_file
+        if ssh_copy_id_public_key_file.startswith('/')
+        else playbook_dir ~ '/../' ~ ssh_copy_id_public_key_file
+      }}
   tasks:
     - name: Validate SSH public key source
       ansible.builtin.assert:
@@ -12,10 +19,30 @@
       tags:
         - ssh_copy_id
 
+    - name: Check SSH public key exists on control
+      ansible.builtin.stat:
+        path: "{{ ssh_copy_id_public_key_path }}"
+      register: ssh_copy_id_public_key_stat
+      delegate_to: localhost
+      become: false
+      run_once: true
+      tags:
+        - ssh_copy_id
+
+    - name: Fail when SSH public key is missing
+      ansible.builtin.fail:
+        msg: >-
+          SSH public key file not found on control: {{ ssh_copy_id_public_key_path }}.
+          Check ANSIBLE_SSH_COPY_ID_PUBLIC_KEY_FILE in .env.
+      when: not ssh_copy_id_public_key_stat.stat.exists
+      run_once: true
+      tags:
+        - ssh_copy_id
+
     - name: Install SSH public key for Ansible user
       ansible.posix.authorized_key:
         user: "{{ ansible_user }}"
-        key: "{{ lookup('file', ssh_copy_id_public_key_file) }}"
+        key: "{{ lookup('file', ssh_copy_id_public_key_path) }}"
         state: present
         manage_dir: true
       tags:

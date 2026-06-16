@@ -2,20 +2,35 @@
 
 Initializes a Docker Swarm on the first manager and joins the remaining managers and workers.
 
+## Commands
+
+Initialize or converge Swarm:
+
+```bash
+cd Ansible
+./scripts/run-ansible.sh deploy --tags docker_swarm
+```
+
+Configure iptables separately:
+
+```bash
+./scripts/run-ansible.sh deploy --tags docker_swarm_iptables
+```
+
 Inventory example:
 
 ```ini
 [swarm_managers]
-192.168.1.151 docker_swarm_advertise_addr=192.168.1.151
+manager-01 ansible_host=<manager-ip> docker_swarm_advertise_addr=<manager-ip>
 
 [swarm_app_workers]
-192.168.1.152 docker_swarm_advertise_addr=192.168.1.152
-192.168.1.153 docker_swarm_advertise_addr=192.168.1.153
-192.168.1.154 docker_swarm_advertise_addr=192.168.1.154
+app-worker-01 ansible_host=<app-worker-ip-1> docker_swarm_advertise_addr=<app-worker-ip-1>
+app-worker-02 ansible_host=<app-worker-ip-2> docker_swarm_advertise_addr=<app-worker-ip-2>
+app-worker-03 ansible_host=<app-worker-ip-3> docker_swarm_advertise_addr=<app-worker-ip-3>
 
 [swarm_data_workers]
-192.168.1.155 docker_swarm_advertise_addr=192.168.1.155
-192.168.1.156 docker_swarm_advertise_addr=192.168.1.156
+data-worker-01 ansible_host=<data-worker-ip-1> docker_swarm_advertise_addr=<data-worker-ip-1>
+data-worker-02 ansible_host=<data-worker-ip-2> docker_swarm_advertise_addr=<data-worker-ip-2>
 
 [swarm_workers:children]
 swarm_app_workers
@@ -30,11 +45,11 @@ Key variables:
 
 ```yaml
 docker_swarm_enabled: true
-docker_swarm_listen_addr: "0.0.0.0:2377"
+docker_swarm_listen_addr: "<listen-ip>:2377"
 docker_swarm_port: 2377
 docker_swarm_force_reset: false
 docker_swarm_manage_iptables: true
-docker_swarm_iptables_source_cidr: "0.0.0.0/0"
+docker_swarm_iptables_source_cidr: "<source-cidr>"
 docker_swarm_manage_encrypted_overlay_esp: false
 docker_swarm_service_ports:
   - port: 80
@@ -67,5 +82,10 @@ Override or add labels per host when needed:
 
 ```ini
 [swarm_app_workers]
-192.168.1.152 docker_swarm_advertise_addr=192.168.1.152 docker_swarm_node_labels='{"rack":"rack-a"}'
+app-worker-01 ansible_host=<app-worker-ip-1> docker_swarm_advertise_addr=<app-worker-ip-1> docker_swarm_node_labels='{"rack":"rack-a"}'
 ```
+
+## Task Runbooks
+
+- [Docker Swarm](../../docs/tasks/docker-swarm/README.md)
+- [Docker Swarm iptables](../../docs/tasks/docker-swarm-iptables/README.md)

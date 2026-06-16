@@ -32,12 +32,18 @@ providers/
 # Ansible local environment and artifacts
 Ansible/.env
 !Ansible/.env.example
+Ansible/env.d/*.env
+!Ansible/env.d/*.env.example
+!Ansible/env.d/README.md
 Ansible/dist/
 Ansible/*.retry
 Ansible/**/__pycache__/
 Ansible/**/*.pyc
 Ansible/repo/**/*.deb
+Ansible/repo/docker-images/*.tar
+Ansible/repo/docker-images/*.tar.gz
 !Ansible/repo/README.md
+!Ansible/repo/docker-images/README.md
 Ansible/inventories/*/secrets/*
 !Ansible/inventories/*/secrets/auth.yaml.example
 Ansible/README.md.bk

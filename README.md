@@ -136,13 +136,26 @@ Create local environment configuration:
 cp .env.example .env
 ```
 
-Edit `.env` for:
+Use `.env` only for common runtime and SSH settings:
 
-- target host IPs
 - SSH user and private key path
-- hostname and network settings
-- Docker Swarm manager/worker settings
-- Zabbix server host and agent hostname settings
+- optional SSH password for first key bootstrap
+- sudo/become password or secret vars file
+- runtime image and offline-control settings
+
+Split task-specific settings into `env.d/*.env`. Copy only the task templates
+you need:
+
+```bash
+cp env.d/10-inventory.env.example env.d/10-inventory.env
+cp env.d/20-base.env.example env.d/20-base.env
+cp env.d/30-zabbix-agent.env.example env.d/30-zabbix-agent.env
+cp env.d/70-tldh-database.env.example env.d/70-tldh-database.env
+```
+
+`scripts/run-ansible.sh` keeps the same command format. When a command uses
+`--tags`, it loads `.env`, `env.d/10-inventory.env`, and only the env file for
+that tag. Running without `--tags` loads all `env.d/*.env`.
 
 Place secrets under:
 
@@ -172,6 +185,7 @@ Run individual areas when needed:
 ./scripts/run-ansible.sh deploy --tags docker
 ./scripts/run-ansible.sh deploy --tags zabbix
 ./scripts/run-ansible.sh deploy --tags docker_swarm
+./scripts/run-ansible.sh deploy --tags tldh_database
 ./scripts/run-ansible.sh deploy --tags hostname --limit <host>
 ./scripts/run-ansible.sh deploy --tags network --limit <host>
 ```
@@ -218,6 +232,7 @@ For Ansible, prepare the offline bundle on an online machine:
 ```bash
 cd Ansible
 cp .env.example .env
+cp env.d/90-offline-bundle.env.example env.d/90-offline-bundle.env
 ./scripts/build-offline-bundle.sh
 ```
 
@@ -237,6 +252,9 @@ Before running Ansible offline, make sure:
 - SSH keys and optional sudo secret are present
 - local `.deb` payloads exist under `Ansible/repo/` when target hosts cannot use
   apt repositories
+- Dockerized DNS/time image tar files exist under
+  `Ansible/repo/docker-images/` when deploying those services offline. The
+  Ansible bundle builder creates them automatically by default.
 
 Relevant Ansible repo directories:
 
@@ -244,12 +262,13 @@ Relevant Ansible repo directories:
 Ansible/repo/prerequisite/
 Ansible/repo/docker/
 Ansible/repo/zabbix/
+Ansible/repo/docker-images/
 ```
 
 ## Safety Notes
 
-- Keep local `.env`, `.env.compose`, `.env.terraform`, secrets, state files, and
-  package payloads out of git.
+- Keep local `.env`, `Ansible/env.d/*.env`, `.env.compose`, `.env.terraform`,
+  secrets, state files, and package payloads out of git.
 - Change hostnames and static IP addresses with `--limit` one host at a time.
 - For Docker Swarm, define manager and worker groups before running the Swarm
   role.

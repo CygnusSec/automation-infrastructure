@@ -7,6 +7,12 @@ IMAGE_TAR="${1:-${DEFAULT_IMAGE_TAR}}"
 RUNTIME_IMAGE_FILE="$(dirname "${IMAGE_TAR}")/runtime-image.txt"
 ENV_FILE="${ROOT_DIR}/.env"
 ENV_EXAMPLE="${ROOT_DIR}/.env.example"
+ENV_DIR="${ROOT_DIR}/env.d"
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Docker is required on the offline control machine." >&2
+  exit 1
+fi
 
 if [[ ! -f "${IMAGE_TAR}" ]]; then
   echo "Runtime image tar not found: ${IMAGE_TAR}" >&2
@@ -37,6 +43,16 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   fi
 fi
 
+if [[ -d "${ENV_DIR}" ]]; then
+  for env_example in "${ENV_DIR}"/[0-7][0-9]-*.env.example; do
+    [[ -f "${env_example}" ]] || continue
+    env_file="${env_example%.example}"
+    if [[ ! -f "${env_file}" ]]; then
+      cp "${env_example}" "${env_file}"
+    fi
+  done
+fi
+
 set_env_value() {
   local key="$1"
   local value="$2"
@@ -61,4 +77,4 @@ set_env_value "LOCAL_RUNTIME_IMAGE" "${RUNTIME_IMAGE_NAME}"
 set_env_value "RUNTIME_IMAGE" ""
 
 echo "Offline control machine is prepared."
-echo "Review ${ENV_FILE}, then run: ./scripts/run-ansible.sh deploy --syntax-check"
+echo "Review ${ENV_FILE} and env.d/*.env, then run: ./scripts/run-ansible.sh deploy --syntax-check"

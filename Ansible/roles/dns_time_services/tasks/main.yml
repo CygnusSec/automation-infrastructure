@@ -1,0 +1,417 @@
+---
+- name: Validate DNS/time service configuration
+  ansible.builtin.assert:
+    that:
+      - dns_server_enabled | bool or time_server_enabled | bool
+      - not dns_server_enabled | bool or dns_server_image | length > 0
+      - not time_server_enabled | bool or time_server_image | length > 0
+    fail_msg: "Enable at least one service and set image names before running dns_time_services."
+  tags:
+    - dns_time_services
+    - dns_server
+    - time_server
+
+- name: Check Docker is available on target
+  ansible.builtin.command: docker info
+  register: dns_time_services_docker_check
+  changed_when: false
+  failed_when: false
+  tags:
+    - dns_time_services
+    - dns_server
+    - time_server
+
+- name: Fail when Docker is not available on target
+  ansible.builtin.fail:
+    msg: >-
+      Docker is required on {{ inventory_hostname }} before deploying DNS/time
+      services. Install Docker on the target host first, then rerun this play.
+  when: dns_time_services_docker_check.rc != 0
+  tags:
+    - dns_time_services
+    - dns_server
+    - time_server
+
+- name: Create DNS/time base directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ dns_time_services_base_dir }}"
+    - "{{ dns_time_services_image_dir }}"
+  tags:
+    - dns_time_services
+
+- name: Create DNS config directory
+  ansible.builtin.file:
+    path: "{{ dns_server_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: dns_server_enabled | bool
+  tags:
+    - dns_time_services
+    - dns_server
+
+- name: Create DNS cache directory
+  ansible.builtin.file:
+    path: "{{ dns_server_cache_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0777"
+  when: dns_server_enabled | bool
+  tags:
+    - dns_time_services
+    - dns_server
+
+- name: Render DNS named.conf
+  ansible.builtin.template:
+    src: named.conf.j2
+    dest: "{{ dns_server_config_dir }}/named.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  register: dns_server_named_conf
+  when: dns_server_enabled | bool
+  tags:
+    - dns_time_services
+    - dns_server
+
+- name: Render DNS named.conf.options
+  ansible.builtin.template:
+    src: named.conf.options.j2
+    dest: "{{ dns_server_config_dir }}/named.conf.options"
+    owner: root
+    group: root
+    mode: "0644"
+  register: dns_server_options_conf
+  when: dns_server_enabled | bool
+  tags:
+    - dns_time_services
+    - dns_server
+
+- name: Render DNS zone files
+  ansible.builtin.template:
+    src: db.zone.j2
+    dest: "{{ dns_server_config_dir }}/db.{{ zone.name }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ dns_server_zones }}"
+  loop_control:
+    loop_var: zone
+    label: "{{ zone.name }}"
+  register: dns_server_zone_files
+  when: dns_server_enabled | bool
+  tags:
+    - dns_time_services
+    - dns_server
+
+- name: Create time server config directory
+  ansible.builtin.file:
+    path: "{{ time_server_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: time_server_enabled | bool
+  tags:
+    - dns_time_services
+    - time_server
+
+- name: Render chrony config
+  ansible.builtin.template:
+    src: chrony.conf.j2
+    dest: "{{ time_server_config_dir }}/chrony.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  register: time_server_chrony_conf
+  when: time_server_enabled | bool
+  tags:
+    - dns_time_services
+    - time_server
+
+- name: Check DNS Docker image
+  ansible.builtin.command: docker image inspect "{{ dns_server_image }}"
+  register: dns_server_image_check
+  changed_when: false
+  failed_when: false
+  when: dns_server_enabled | bool
+  tags:
+    - dns_time_services
+    - dns_server
+
+- name: Validate DNS image tar exists on control
+  ansible.builtin.stat:
+    path: "{{ dns_server_image_tar_path }}"
+  register: dns_server_image_tar_stat
+  delegate_to: localhost
+  become: false
+  when:
+    - dns_server_enabled | bool
+    - dns_time_services_load_images | bool
+    - dns_server_image_check.rc != 0
+  tags:
+    - dns_time_services
+    - dns_server
+
+- name: Fail when DNS image tar is missing
+  ansible.builtin.fail:
+    msg: >-
+      DNS image is missing on target and tar was not found on control:
+      {{ dns_server_image_tar_path }}. Build the offline bundle on an online
+      machine or copy the tar file to {{ dns_server_image_tar }}.
+  when:
+    - dns_server_enabled | bool
+    - dns_time_services_load_images | bool
+    - dns_server_image_check.rc != 0
+    - not dns_server_image_tar_stat.stat.exists
+  tags:
+    - dns_time_services
+    - dns_server
+
+- name: Copy DNS image tar to target
+  ansible.builtin.copy:
+    src: "{{ dns_server_image_tar_path }}"
+    dest: "{{ dns_time_services_image_dir }}/bind9.tar"
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - dns_server_enabled | bool
+    - dns_time_services_load_images | bool
+    - dns_server_image_check.rc != 0
+  tags:
+    - dns_time_services
+    - dns_server
+
+- name: Load DNS Docker image
+  ansible.builtin.command: docker load -i "{{ dns_time_services_image_dir }}/bind9.tar"
+  register: dns_server_image_load
+  changed_when: true
+  when:
+    - dns_server_enabled | bool
+    - dns_time_services_load_images | bool
+    - dns_server_image_check.rc != 0
+  tags:
+    - dns_time_services
+    - dns_server
+
+- name: Verify DNS Docker image is available
+  ansible.builtin.command: docker image inspect "{{ dns_server_image }}"
+  register: dns_server_image_verify
+  changed_when: false
+  failed_when: false
+  when: dns_server_enabled | bool
+  tags:
+    - dns_time_services
+    - dns_server
+
+- name: Fail when DNS Docker image is unavailable
+  ansible.builtin.fail:
+    msg: >-
+      DNS Docker image {{ dns_server_image }} is not available on target after
+      offline image loading. Check that {{ dns_server_image_tar_path }} exists on
+      the control machine and contains the same image tag.
+  when:
+    - dns_server_enabled | bool
+    - dns_server_image_verify.rc != 0
+  tags:
+    - dns_time_services
+    - dns_server
+
+- name: Check time Docker image
+  ansible.builtin.command: docker image inspect "{{ time_server_image }}"
+  register: time_server_image_check
+  changed_when: false
+  failed_when: false
+  when: time_server_enabled | bool
+  tags:
+    - dns_time_services
+    - time_server
+
+- name: Validate time image tar exists on control
+  ansible.builtin.stat:
+    path: "{{ time_server_image_tar_path }}"
+  register: time_server_image_tar_stat
+  delegate_to: localhost
+  become: false
+  when:
+    - time_server_enabled | bool
+    - dns_time_services_load_images | bool
+    - time_server_image_check.rc != 0
+  tags:
+    - dns_time_services
+    - time_server
+
+- name: Fail when time image tar is missing
+  ansible.builtin.fail:
+    msg: >-
+      Time server image is missing on target and tar was not found on control:
+      {{ time_server_image_tar_path }}. Build the offline bundle on an online
+      machine or copy the tar file to {{ time_server_image_tar }}.
+  when:
+    - time_server_enabled | bool
+    - dns_time_services_load_images | bool
+    - time_server_image_check.rc != 0
+    - not time_server_image_tar_stat.stat.exists
+  tags:
+    - dns_time_services
+    - time_server
+
+- name: Copy time image tar to target
+  ansible.builtin.copy:
+    src: "{{ time_server_image_tar_path }}"
+    dest: "{{ dns_time_services_image_dir }}/chrony.tar"
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - time_server_enabled | bool
+    - dns_time_services_load_images | bool
+    - time_server_image_check.rc != 0
+  tags:
+    - dns_time_services
+    - time_server
+
+- name: Load time Docker image
+  ansible.builtin.command: docker load -i "{{ dns_time_services_image_dir }}/chrony.tar"
+  register: time_server_image_load
+  changed_when: true
+  when:
+    - time_server_enabled | bool
+    - dns_time_services_load_images | bool
+    - time_server_image_check.rc != 0
+  tags:
+    - dns_time_services
+    - time_server
+
+- name: Verify time Docker image is available
+  ansible.builtin.command: docker image inspect "{{ time_server_image }}"
+  register: time_server_image_verify
+  changed_when: false
+  failed_when: false
+  when: time_server_enabled | bool
+  tags:
+    - dns_time_services
+    - time_server
+
+- name: Fail when time Docker image is unavailable
+  ansible.builtin.fail:
+    msg: >-
+      Time server Docker image {{ time_server_image }} is not available on
+      target after offline image loading. Check that {{ time_server_image_tar_path }}
+      exists on the control machine and contains the same image tag.
+  when:
+    - time_server_enabled | bool
+    - time_server_image_verify.rc != 0
+  tags:
+    - dns_time_services
+    - time_server
+
+- name: Check DNS container
+  ansible.builtin.command: docker container inspect "{{ dns_server_container_name }}"
+  register: dns_server_container_check
+  changed_when: false
+  failed_when: false
+  when: dns_server_enabled | bool
+  tags:
+    - dns_time_services
+    - dns_server
+
+- name: Check DNS container cache mount
+  ansible.builtin.command: >
+    docker inspect
+    --format {% raw %}'{{ range .Mounts }}{{ if eq .Destination "/var/cache/bind" }}{{ .Source }}{{ end }}{{ end }}'{% endraw %}
+    "{{ dns_server_container_name }}"
+  register: dns_server_cache_mount_check
+  changed_when: false
+  failed_when: false
+  when:
+    - dns_server_enabled | bool
+    - dns_server_container_check.rc == 0
+  tags:
+    - dns_time_services
+    - dns_server
+
+- name: Recreate DNS container when needed
+  ansible.builtin.command: docker rm -f "{{ dns_server_container_name }}"
+  changed_when: true
+  failed_when: false
+  when:
+    - dns_server_enabled | bool
+    - dns_server_container_check.rc == 0
+    - dns_server_named_conf.changed or dns_server_options_conf.changed or dns_server_zone_files.changed or (dns_server_image_load is defined and dns_server_image_load.changed) or (dns_server_cache_mount_check is defined and dns_server_cache_mount_check.stdout != dns_server_cache_dir)
+  tags:
+    - dns_time_services
+    - dns_server
+
+- name: Run DNS container
+  ansible.builtin.shell: >
+    docker run -d
+    --name {{ dns_server_container_name }}
+    --restart unless-stopped
+    --network host
+    --pull never
+    -v {{ dns_server_config_dir }}:/etc/bind:ro
+    -v {{ dns_server_cache_dir }}:/var/cache/bind
+    {{ dns_server_image }}
+    {{ dns_server_command }}
+  args:
+    executable: /bin/bash
+  changed_when: true
+  when:
+    - dns_server_enabled | bool
+    - dns_server_container_check.rc != 0 or dns_server_named_conf.changed or dns_server_options_conf.changed or dns_server_zone_files.changed or (dns_server_image_load is defined and dns_server_image_load.changed) or (dns_server_cache_mount_check is defined and dns_server_cache_mount_check.stdout != dns_server_cache_dir)
+  tags:
+    - dns_time_services
+    - dns_server
+
+- name: Check time server container
+  ansible.builtin.command: docker container inspect "{{ time_server_container_name }}"
+  register: time_server_container_check
+  changed_when: false
+  failed_when: false
+  when: time_server_enabled | bool
+  tags:
+    - dns_time_services
+    - time_server
+
+- name: Recreate time server container when needed
+  ansible.builtin.command: docker rm -f "{{ time_server_container_name }}"
+  changed_when: true
+  failed_when: false
+  when:
+    - time_server_enabled | bool
+    - time_server_container_check.rc == 0
+    - time_server_chrony_conf.changed or (time_server_image_load is defined and time_server_image_load.changed)
+  tags:
+    - dns_time_services
+    - time_server
+
+- name: Run time server container
+  ansible.builtin.shell: >
+    docker run -d
+    --name {{ time_server_container_name }}
+    --restart unless-stopped
+    --network host
+    {{ time_server_extra_docker_args }}
+    --pull never
+    -v {{ time_server_config_dir }}:/etc/chrony:ro
+    {{ time_server_image }}
+    {{ time_server_command }}
+  args:
+    executable: /bin/bash
+  changed_when: true
+  when:
+    - time_server_enabled | bool
+    - time_server_container_check.rc != 0 or time_server_chrony_conf.changed or (time_server_image_load is defined and time_server_image_load.changed)
+  tags:
+    - dns_time_services
+    - time_server

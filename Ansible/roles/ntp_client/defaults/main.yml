@@ -1,0 +1,7 @@
+---
+ntp_client_enabled: false
+ntp_client_servers: []
+ntp_client_fallback_servers: []
+ntp_client_conf_dir: /etc/systemd/timesyncd.conf.d
+ntp_client_conf_file: "{{ ntp_client_conf_dir }}/10-ansible-ntp.conf"
+ntp_client_service_name: systemd-timesyncd

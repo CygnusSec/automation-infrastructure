@@ -1,0 +1,176 @@
+---
+- name: Resolve TLDH database role for this host
+  ansible.builtin.set_fact:
+    tldh_database_role: "{{ 'master' if inventory_hostname in groups[tldh_database_master_group] else 'slave' }}"
+  tags:
+    - tldh_database
+
+- name: Validate TLDH database configuration
+  ansible.builtin.assert:
+    that:
+      - groups[tldh_database_master_group] is defined
+      - groups[tldh_database_master_group] | length == 1
+      - groups[tldh_database_slave_group] is defined
+      - groups[tldh_database_slave_group] | length >= 1
+      - tldh_database_root_password | length > 0
+      - tldh_database_app_user | length > 0
+      - tldh_database_app_password | length > 0
+      - tldh_database_replication_user | length > 0
+      - tldh_database_replication_password | length > 0
+      - tldh_database_master_host | length > 0
+    fail_msg: "Check TLDH database host groups and required passwords before running tldh_database."
+  run_once: true
+  tags:
+    - tldh_database
+
+- name: Check Docker is available
+  ansible.builtin.command: docker info
+  register: tldh_database_docker_info
+  changed_when: false
+  failed_when: false
+  tags:
+    - tldh_database
+
+- name: Fail when Docker is unavailable
+  ansible.builtin.fail:
+    msg: "Docker is required on {{ inventory_hostname }} before deploying TLDH database."
+  when: tldh_database_docker_info.rc != 0
+  tags:
+    - tldh_database
+
+- name: Create TLDH database directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ tldh_database_base_dir }}"
+      mode: "0755"
+    - path: "{{ tldh_database_config_dir }}"
+      mode: "0755"
+    - path: "{{ tldh_database_data_dir }}"
+      mode: "0755"
+    - path: "{{ tldh_database_image_tar_dest | dirname }}"
+      mode: "0755"
+  tags:
+    - tldh_database
+
+- name: Render TLDH MariaDB config
+  ansible.builtin.template:
+    src: myV2.cnf.j2
+    dest: "{{ tldh_database_config_dir }}/myV2.cnf"
+    owner: root
+    group: root
+    mode: "0644"
+  register: tldh_database_config
+  tags:
+    - tldh_database
+
+- name: Render TLDH MariaDB entrypoint
+  ansible.builtin.template:
+    src: docker-entrypoint.sh.j2
+    dest: "{{ tldh_database_config_dir }}/docker-entrypoint.sh"
+    owner: root
+    group: root
+    mode: "0755"
+  register: tldh_database_entrypoint
+  tags:
+    - tldh_database
+
+- name: Render TLDH database compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ tldh_database_compose_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+  register: tldh_database_compose
+  no_log: true
+  tags:
+    - tldh_database
+
+- name: Check TLDH database Docker image
+  ansible.builtin.command: docker image inspect "{{ tldh_database_image }}"
+  register: tldh_database_image_check
+  changed_when: false
+  failed_when: false
+  tags:
+    - tldh_database
+
+- name: Validate TLDH database image tar exists on control
+  ansible.builtin.stat:
+    path: "{{ tldh_database_image_tar }}"
+  register: tldh_database_image_tar_stat
+  delegate_to: localhost
+  become: false
+  when:
+    - tldh_database_load_image | bool
+    - tldh_database_image_check.rc != 0
+  tags:
+    - tldh_database
+
+- name: Fail when TLDH database image is missing
+  ansible.builtin.fail:
+    msg: "Docker image {{ tldh_database_image }} is missing and image tar was not found on control: {{ tldh_database_image_tar }}"
+  when:
+    - tldh_database_load_image | bool
+    - tldh_database_image_check.rc != 0
+    - not tldh_database_image_tar_stat.stat.exists
+  tags:
+    - tldh_database
+
+- name: Copy TLDH database image tar to target
+  ansible.builtin.copy:
+    src: "{{ tldh_database_image_tar }}"
+    dest: "{{ tldh_database_image_tar_dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - tldh_database_load_image | bool
+    - tldh_database_image_check.rc != 0
+  tags:
+    - tldh_database
+
+- name: Load TLDH database Docker image
+  ansible.builtin.command: docker load -i "{{ tldh_database_image_tar_dest }}"
+  changed_when: true
+  when:
+    - tldh_database_load_image | bool
+    - tldh_database_image_check.rc != 0
+  tags:
+    - tldh_database
+
+- name: Check TLDH database container
+  ansible.builtin.command: docker container inspect "{{ tldh_database_container_name }}"
+  register: tldh_database_container_check
+  changed_when: false
+  failed_when: false
+  tags:
+    - tldh_database
+
+- name: Recreate TLDH database container when config changed
+  ansible.builtin.command: docker rm -f "{{ tldh_database_container_name }}"
+  changed_when: true
+  failed_when: false
+  when:
+    - tldh_database_container_check.rc == 0
+    - tldh_database_config.changed or tldh_database_entrypoint.changed or tldh_database_compose.changed
+  tags:
+    - tldh_database
+
+- name: Deploy TLDH database container
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - -f
+      - "{{ tldh_database_compose_file }}"
+      - up
+      - -d
+  register: tldh_database_compose_up
+  changed_when: "'Started' in tldh_database_compose_up.stdout or 'Created' in tldh_database_compose_up.stdout or 'Recreated' in tldh_database_compose_up.stdout"
+  tags:
+    - tldh_database

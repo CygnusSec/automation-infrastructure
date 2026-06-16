@@ -3,10 +3,28 @@ zabbix_agent_enabled: false
 zabbix_agent_install_from_local_repo: false
 zabbix_agent_repo_source: ./repo/zabbix
 zabbix_agent_repo_dest: /media/installation/zabbix
+zabbix_agent_manage_apt_repo: true
+zabbix_agent_release_url: https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb
+zabbix_agent_release_package_path: /tmp/zabbix-release_latest_7.0+ubuntu24.04_all.deb
 zabbix_agent_packages:
-  - zabbix-agent
-zabbix_agent_service_name: zabbix-agent
-zabbix_agent_config_file: /etc/zabbix/zabbix_agentd.conf
+  - zabbix-agent2
+  - zabbix-agent2-plugin-mongodb
+  - zabbix-agent2-plugin-mssql
+  - zabbix-agent2-plugin-postgresql
+zabbix_agent_service_name: zabbix-agent2
+zabbix_agent_config_file: /etc/zabbix/zabbix_agent2.conf
 zabbix_agent_server_host: ""
 zabbix_agent_server_active: "{{ zabbix_agent_server_host }}"
-zabbix_agent_hostname: "{{ inventory_hostname }}"
+zabbix_agent_hostname: "{{ ansible_hostname | default(inventory_hostname) }}"
+zabbix_agent_remove_legacy_agent: true
+zabbix_agent_legacy_packages:
+  - zabbix-agent
+zabbix_agent_legacy_services:
+  - zabbix-agent
+zabbix_agent_uninstall_packages: "{{ (zabbix_agent_packages + ['zabbix-agent']) | unique }}"
+zabbix_agent_uninstall_services:
+  - zabbix-agent2
+  - zabbix-agent
+zabbix_agent_uninstall_purge: true
+zabbix_agent_uninstall_autoremove: true
+zabbix_agent_uninstall_remove_local_repo: false

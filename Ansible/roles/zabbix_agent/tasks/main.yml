@@ -4,12 +4,64 @@
     that:
       - zabbix_agent_server_host | length > 0
       - zabbix_agent_hostname | length > 0
-    fail_msg: "Set zabbix_agent_server_host and zabbix_agent_hostname before running the zabbix_agent role."
+      - zabbix_agent_packages is sequence
+      - "'zabbix-agent2' in zabbix_agent_packages"
+    fail_msg: "Set zabbix_agent_server_host and zabbix_agent_hostname, and keep zabbix-agent2 in zabbix_agent_packages."
+  tags:
+    - zabbix
+    - zabbix_agent
+
+- name: Stop legacy Zabbix agent service before migration
+  become: true
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  loop: "{{ zabbix_agent_legacy_services }}"
+  failed_when: false
+  when: zabbix_agent_remove_legacy_agent | bool
+  tags:
+    - zabbix
+    - zabbix_agent
+
+- name: Remove legacy Zabbix agent packages before Agent 2 install
+  become: true
+  ansible.builtin.apt:
+    name: "{{ zabbix_agent_legacy_packages }}"
+    state: absent
+    purge: true
+    autoremove: true
+  when: zabbix_agent_remove_legacy_agent | bool
+  tags:
+    - zabbix
+    - zabbix_agent
+
+- name: Download Zabbix apt repository package
+  become: true
+  ansible.builtin.get_url:
+    url: "{{ zabbix_agent_release_url }}"
+    dest: "{{ zabbix_agent_release_package_path }}"
+    mode: "0644"
+  when:
+    - zabbix_agent_manage_apt_repo | bool
+    - not zabbix_agent_install_from_local_repo | bool
+  tags:
+    - zabbix
+    - zabbix_agent
+
+- name: Install Zabbix apt repository package
+  become: true
+  ansible.builtin.apt:
+    deb: "{{ zabbix_agent_release_package_path }}"
+  when:
+    - zabbix_agent_manage_apt_repo | bool
+    - not zabbix_agent_install_from_local_repo | bool
   tags:
     - zabbix
     - zabbix_agent
 
 - name: Update apt cache for Zabbix agent
+  become: true
   ansible.builtin.apt:
     update_cache: true
     cache_valid_time: 3600
@@ -19,6 +71,7 @@
     - zabbix_agent
 
 - name: Install Zabbix agent from apt repositories
+  become: true
   ansible.builtin.apt:
     name: "{{ zabbix_agent_packages }}"
     state: present
@@ -28,6 +81,7 @@
     - zabbix_agent
 
 - name: Create Zabbix local repo directory
+  become: true
   ansible.builtin.file:
     path: "{{ zabbix_agent_repo_dest }}"
     state: directory
@@ -39,7 +93,34 @@
     - zabbix
     - zabbix_agent
 
+- name: Check Zabbix local deb repository source
+  ansible.builtin.stat:
+    path: "{{ zabbix_agent_repo_source }}"
+  register: zabbix_agent_repo_source_stat
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when: zabbix_agent_install_from_local_repo | bool
+  tags:
+    - zabbix
+    - zabbix_agent
+
+- name: Fail when Zabbix local deb repository source is missing
+  ansible.builtin.fail:
+    msg: >-
+      Zabbix local repository source not found on control:
+      {{ zabbix_agent_repo_source }}. Build/copy offline packages there, or set
+      ANSIBLE_ZABBIX_AGENT_INSTALL_FROM_LOCAL_REPO=false for online install.
+  when:
+    - zabbix_agent_install_from_local_repo | bool
+    - not zabbix_agent_repo_source_stat.stat.exists
+  run_once: true
+  tags:
+    - zabbix
+    - zabbix_agent
+
 - name: Copy Zabbix local deb repository
+  become: true
   ansible.builtin.copy:
     src: "{{ zabbix_agent_repo_source }}/"
     dest: "{{ zabbix_agent_repo_dest }}/"
@@ -52,6 +133,7 @@
     - zabbix_agent
 
 - name: Find Zabbix deb packages
+  become: true
   ansible.builtin.find:
     paths: "{{ zabbix_agent_repo_dest }}"
     patterns: "*.deb"
@@ -73,7 +155,10 @@
     - zabbix_agent
 
 - name: Install Zabbix agent from local deb repository
-  ansible.builtin.shell: apt-get install -y "{{ zabbix_agent_repo_dest }}"/*.deb
+  become: true
+  ansible.builtin.shell: >-
+    apt-get install -y
+    {{ zabbix_agent_local_debs.files | map(attribute='path') | sort | map('quote') | join(' ') }}
   args:
     executable: /bin/bash
   when: zabbix_agent_install_from_local_repo | bool
@@ -82,6 +167,7 @@
     - zabbix_agent
 
 - name: Configure Zabbix server
+  become: true
   ansible.builtin.lineinfile:
     path: "{{ zabbix_agent_config_file }}"
     regexp: "^Server="
@@ -93,6 +179,7 @@
     - zabbix_agent
 
 - name: Configure Zabbix active server
+  become: true
   ansible.builtin.lineinfile:
     path: "{{ zabbix_agent_config_file }}"
     regexp: "^ServerActive="
@@ -104,6 +191,7 @@
     - zabbix_agent
 
 - name: Configure Zabbix agent hostname
+  become: true
   ansible.builtin.lineinfile:
     path: "{{ zabbix_agent_config_file }}"
     regexp: "^Hostname="
@@ -115,6 +203,7 @@
     - zabbix_agent
 
 - name: Enable and start Zabbix agent
+  become: true
   ansible.builtin.systemd:
     name: "{{ zabbix_agent_service_name }}"
     state: started
