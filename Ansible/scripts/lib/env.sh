@@ -68,9 +68,11 @@ load_ansible_env() {
     local file="$1"
     local existing
     [[ -n "${file}" ]] || return 0
-    for existing in "${selected_files[@]}"; do
-      [[ "${existing}" == "${file}" ]] && return 0
-    done
+    if (( ${#selected_files[@]} > 0 )); then
+      for existing in "${selected_files[@]}"; do
+        [[ "${existing}" == "${file}" ]] && return 0
+      done
+    fi
     selected_files+=("${file}")
   }
 
@@ -111,12 +113,14 @@ load_ansible_env() {
         source "${env_fragment}"
       done
     else
-      for env_name in "${selected_files[@]}"; do
-        env_fragment="${env_dir}/${env_name}"
-        [[ -f "${env_fragment}" ]] || continue
-        # shellcheck disable=SC1090
-        source "${env_fragment}"
-      done
+      if (( ${#selected_files[@]} > 0 )); then
+        for env_name in "${selected_files[@]}"; do
+          env_fragment="${env_dir}/${env_name}"
+          [[ -f "${env_fragment}" ]] || continue
+          # shellcheck disable=SC1090
+          source "${env_fragment}"
+        done
+      fi
     fi
   fi
   set +a

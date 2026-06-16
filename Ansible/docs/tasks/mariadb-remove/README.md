@@ -6,14 +6,20 @@ data.
 
 ## What It Does
 
-- removes `mariadb-server` with apt
-- runs apt autoremove
+- stops native MariaDB/MySQL services if present
+- removes configured native MariaDB packages with apt
+- purges package configuration when enabled
+- runs apt autoremove when enabled
 - stays idempotent when `mariadb-server` is not installed
 
 ## Key Variables
 
 ```env
 ANSIBLE_MARIADB_REMOVE_TARGET_GROUP=all_targets
+ANSIBLE_MARIADB_REMOVE_PACKAGES="[mariadb-server]"
+ANSIBLE_MARIADB_REMOVE_SERVICES="[mariadb, mysql]"
+ANSIBLE_MARIADB_REMOVE_PURGE=true
+ANSIBLE_MARIADB_REMOVE_AUTOREMOVE=true
 ```
 
 ## Command

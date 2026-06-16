@@ -72,6 +72,8 @@
       ansible.builtin.include_role:
         name: zabbix_agent
         tasks_from: uninstall
+        apply:
+          become: true
       tags:
         - zabbix_agent_uninstall
   tags:
@@ -81,12 +83,30 @@
   hosts: "{{ lookup('env', 'ANSIBLE_MARIADB_REMOVE_TARGET_GROUP') | default('all_targets', true) }}"
   gather_facts: false
   become: true
+  vars:
+    mariadb_remove_packages: "{{ lookup('env', 'ANSIBLE_MARIADB_REMOVE_PACKAGES') | default('[mariadb-server]', true) | from_yaml }}"
+    mariadb_remove_services: "{{ lookup('env', 'ANSIBLE_MARIADB_REMOVE_SERVICES') | default('[mariadb, mysql]', true) | from_yaml }}"
+    mariadb_remove_purge: "{{ (lookup('env', 'ANSIBLE_MARIADB_REMOVE_PURGE') | default('true', true)) | bool }}"
+    mariadb_remove_autoremove: "{{ (lookup('env', 'ANSIBLE_MARIADB_REMOVE_AUTOREMOVE') | default('true', true)) | bool }}"
   tasks:
-    - name: Remove mariadb-server package
+    - name: Stop native MariaDB services before package removal
+      become: true
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+      loop: "{{ mariadb_remove_services }}"
+      failed_when: false
+      tags:
+        - mariadb_remove
+
+    - name: Remove native MariaDB packages
+      become: true
       ansible.builtin.apt:
-        name: mariadb-server
+        name: "{{ mariadb_remove_packages }}"
         state: absent
-        autoremove: true
+        purge: "{{ mariadb_remove_purge }}"
+        autoremove: "{{ mariadb_remove_autoremove }}"
       tags:
         - mariadb_remove
   tags:

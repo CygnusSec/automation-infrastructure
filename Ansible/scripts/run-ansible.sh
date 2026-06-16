@@ -26,14 +26,23 @@ DEFAULT_ANSIBLE_IMAGE="ansible-base-runtime:local"
 LOCAL_RUNTIME_IMAGE="${LOCAL_RUNTIME_IMAGE:-${DEFAULT_ANSIBLE_IMAGE}}"
 RUNTIME_IMAGE="${RUNTIME_IMAGE:-}"
 ANSIBLE_CONTROL_OFFLINE="${ANSIBLE_CONTROL_OFFLINE:-false}"
-ANSIBLE_SSH_PASSWORD_AUTH="${ANSIBLE_SSH_PASSWORD_AUTH_OVERRIDE:-${ANSIBLE_SSH_PASSWORD_AUTH:-false}}"
-export ANSIBLE_SSH_PASSWORD_AUTH
+ANSIBLE_SSH_USER="${ANSIBLE_SSH_USER:-bcy_admin}"
+export ANSIBLE_SSH_USER
 
 if [[ "${RUNTIME_IMAGE}" == *.tar || "${RUNTIME_IMAGE}" == *.tar.gz ]]; then
   echo "Ignoring RUNTIME_IMAGE tar path while running Ansible: ${RUNTIME_IMAGE}" >&2
   echo "Load runtime image tars with ./scripts/prepare-offline-control.sh, then use LOCAL_RUNTIME_IMAGE." >&2
   RUNTIME_IMAGE=""
 fi
+
+resolve_project_path() {
+  local path="$1"
+  if [[ "${path}" = /* ]]; then
+    printf '%s\n' "${path}"
+  else
+    printf '%s/%s\n' "${ROOT_DIR}" "${path#./}"
+  fi
+}
 
 if [[ -n "${RUNTIME_IMAGE}" ]]; then
   ANSIBLE_IMAGE="${RUNTIME_IMAGE}"
@@ -87,6 +96,37 @@ if [[ -z "${PLAYBOOK_PATH}" ]]; then
   exit 1
 fi
 
+PRIVATE_KEY_PATH="$(resolve_project_path "${ANSIBLE_SSH_PRIVATE_KEY_FILE:-./inventories/customer-a/secrets/id_rsa}")"
+if [[ -n "${ANSIBLE_SSH_PASSWORD_AUTH_OVERRIDE:-}" ]]; then
+  ANSIBLE_SSH_PASSWORD_AUTH="${ANSIBLE_SSH_PASSWORD_AUTH_OVERRIDE}"
+elif [[ "${PLAYBOOK_PATH}" == "playbooks/ssh-copy-id."* ]]; then
+  ANSIBLE_SSH_PASSWORD_AUTH="true"
+elif [[ -f "${PRIVATE_KEY_PATH}" ]]; then
+  ANSIBLE_SSH_PASSWORD_AUTH="false"
+else
+  ANSIBLE_SSH_PASSWORD_AUTH="true"
+fi
+export ANSIBLE_SSH_PASSWORD_AUTH
+
+if [[ "${ANSIBLE_SSH_PASSWORD_AUTH}" == "true" ]]; then
+  if [[ "${PLAYBOOK_PATH}" == "playbooks/ssh-copy-id."* ]]; then
+    echo "WARNING: using SSH password auth only to bootstrap/copy the public key." >&2
+    echo "After this succeeds, run deploy normally; the wrapper will use the private key when it exists: ${PRIVATE_KEY_PATH}" >&2
+  elif [[ -f "${PRIVATE_KEY_PATH}" && -n "${ANSIBLE_SSH_PASSWORD_AUTH_OVERRIDE:-}" ]]; then
+    echo "WARNING: password auth was forced even though a private key exists: ${PRIVATE_KEY_PATH}" >&2
+  else
+    echo "WARNING: SSH private key not found at ${PRIVATE_KEY_PATH}; falling back to password auth." >&2
+    echo "Run ./scripts/run-ansible.sh ssh-copy-id after creating/copying the key, then deploy with key auth." >&2
+  fi
+  ANSIBLE_SSH_COMMON_ARGS="${ANSIBLE_SSH_COMMON_ARGS:--o PubkeyAuthentication=no -o PreferredAuthentications=password}"
+  export ANSIBLE_SSH_COMMON_ARGS
+  if [[ -z "${ANSIBLE_PASSWORD:-}" ]]; then
+    echo "ERROR: password auth is required for this run, but ANSIBLE_PASSWORD is empty." >&2
+    echo "Set ANSIBLE_PASSWORD in .env for bootstrap, or create ${PRIVATE_KEY_PATH} and rerun to use key auth." >&2
+    exit 1
+  fi
+fi
+
 INVENTORY_SECRET_VARS_RELATIVE="${ANSIBLE_INVENTORY_SECRET_VARS:-inventories/customer-a/secrets/auth.yaml}"
 INVENTORY_SECRET_VARS="${ROOT_DIR}/${INVENTORY_SECRET_VARS_RELATIVE}"
 EXTRA_ARGS=()
@@ -116,12 +156,18 @@ if [[ -f "${INVENTORY_SECRET_VARS}" ]]; then
   EXTRA_ARGS+=("-e" "@${INVENTORY_SECRET_VARS_RELATIVE}")
 fi
 
-if [[ -n "${ANSIBLE_PASSWORD:-}" ]]; then
+if [[ "${ANSIBLE_SSH_PASSWORD_AUTH}" == "true" && -n "${ANSIBLE_PASSWORD:-}" ]]; then
   EXTRA_ARGS+=("-e" "ansible_password=${ANSIBLE_PASSWORD}")
 fi
 
 if [[ -n "${ANSIBLE_BECOME_PASSWORD:-}" ]]; then
   EXTRA_ARGS+=("-e" "ansible_become_password=${ANSIBLE_BECOME_PASSWORD}")
+fi
+
+# Force ansible_user via extra-vars (highest priority) to guarantee the
+# correct SSH user regardless of inventory/config state inside the container.
+if [[ -n "${ANSIBLE_SSH_USER:-}" ]]; then
+  EXTRA_ARGS+=("-e" "ansible_user=${ANSIBLE_SSH_USER}")
 fi
 
 if ! docker image inspect "${ANSIBLE_IMAGE}" >/dev/null 2>&1; then

@@ -1,5 +1,6 @@
 ---
 - name: Stop Zabbix agent services before uninstall
+  become: true
   ansible.builtin.systemd:
     name: "{{ item }}"
     state: stopped
@@ -13,6 +14,7 @@
     - zabbix_agent_uninstall
 
 - name: Uninstall Zabbix agent packages
+  become: true
   ansible.builtin.apt:
     name: "{{ zabbix_agent_uninstall_packages }}"
     state: absent
@@ -24,6 +26,7 @@
     - zabbix_agent_uninstall
 
 - name: Remove copied Zabbix local repository
+  become: true
   ansible.builtin.file:
     path: "{{ zabbix_agent_repo_dest }}"
     state: absent

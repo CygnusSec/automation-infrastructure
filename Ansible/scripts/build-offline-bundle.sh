@@ -162,6 +162,17 @@ tar \
 mkdir -p "${PROJECT_DIR}/inventories/customer-a/secrets"
 touch "${PROJECT_DIR}/inventories/customer-a/secrets/.gitkeep"
 
+# Copy .env.example files as starting templates so the operator only needs
+# to fill in values rather than creating files from scratch.
+if [[ -f "${ROOT_DIR}/.env.example" ]]; then
+  cp "${ROOT_DIR}/.env.example" "${PROJECT_DIR}/.env"
+fi
+for example_file in "${ROOT_DIR}"/env.d/*.env.example; do
+  [[ -f "${example_file}" ]] || continue
+  target="${PROJECT_DIR}/env.d/$(basename "${example_file}" .example)"
+  cp "${example_file}" "${target}"
+done
+
 echo "${PACKAGE_IMAGE}" > "${IMAGE_DIR}/runtime-image.txt"
 
 cat > "${BUNDLE_DIR}/README-offline-control.md" <<EOF
