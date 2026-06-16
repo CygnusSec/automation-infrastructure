@@ -102,6 +102,12 @@ while IFS='=' read -r env_name _; do
   esac
 done < <(env | sort)
 
+# Set ANSIBLE_REMOTE_USER (Ansible built-in) so Ansible never falls back to
+# the container's OS user (root) when group_vars somehow fail to apply.
+if [[ -n "${ANSIBLE_SSH_USER:-}" ]]; then
+  DOCKER_ENV_ARGS+=("-e" "ANSIBLE_REMOTE_USER=${ANSIBLE_SSH_USER}")
+fi
+
 if [[ "${ANSIBLE_SSH_PASSWORD_AUTH}" == "true" && -n "${ANSIBLE_SSH_COMMON_ARGS:-}" ]]; then
   DOCKER_ENV_ARGS+=("-e" "ANSIBLE_SSH_COMMON_ARGS=${ANSIBLE_SSH_COMMON_ARGS}")
 fi
@@ -134,16 +140,28 @@ if ! docker image inspect "${ANSIBLE_IMAGE}" >/dev/null 2>&1; then
   fi
 fi
 
-# Pre-flight check: verify critical inventory variables are loaded.
-if [[ -z "${ANSIBLE_SWARM_MANAGER_HOSTS:-}" && -z "${ANSIBLE_ALL_TARGET_HOSTS:-}" ]]; then
+# Pre-flight check: verify at least one inventory host variable is loaded.
+# Any non-empty host var from 10-inventory.env proves the env was sourced.
+_preflight_has_hosts="false"
+for _pf_var in ANSIBLE_SWARM_MANAGER_HOSTS ANSIBLE_ALL_TARGET_HOSTS \
+               ANSIBLE_ZABBIX_AGENT_HOSTS ANSIBLE_DNS_TIME_SERVER_HOSTS \
+               ANSIBLE_EXTERNAL_DISK_HOSTS ANSIBLE_TLDH_DATABASE_MASTER_HOST; do
+  if [[ -n "${!_pf_var:-}" ]]; then
+    _preflight_has_hosts="true"
+    break
+  fi
+done
+
+if [[ "${_preflight_has_hosts}" == "false" ]]; then
   echo "" >&2
-  echo "ERROR: Inventory host variables are empty." >&2
-  echo "Neither ANSIBLE_SWARM_MANAGER_HOSTS nor ANSIBLE_ALL_TARGET_HOSTS is set." >&2
+  echo "ERROR: All inventory host variables are empty." >&2
+  echo "env.d/10-inventory.env was not loaded or contains no host definitions." >&2
   echo "Ansible will not find any hosts to target." >&2
   echo "" >&2
   echo "Troubleshooting:" >&2
   echo "  1. Verify env.d/10-inventory.env exists and contains host definitions" >&2
   echo "  2. Run: source scripts/lib/env.sh && load_ansible_env \"\$(pwd)\" && echo \"\${ANSIBLE_SWARM_MANAGER_HOSTS}\"" >&2
+  echo "  3. On the server, check file permissions: ls -la env.d/10-inventory.env" >&2
   echo "" >&2
   exit 1
 fi
