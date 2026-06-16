@@ -15,7 +15,7 @@ cd Ansible
 Test one host first:
 
 ```bash
-./scripts/run-ansible.sh deploy --tags external_disk --limit 172.16.4.11
+./scripts/run-ansible.sh deploy --tags external_disk --limit <target-host-or-ip>
 ```
 
 ## Key Variables
@@ -34,4 +34,3 @@ ANSIBLE_EXTERNAL_DISK_FORMAT=true
 ## Task Runbook
 
 See [External Disk](../../docs/tasks/external-disk/README.md).
-

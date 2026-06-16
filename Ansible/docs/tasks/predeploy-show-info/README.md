@@ -21,7 +21,7 @@ Limit to one group or host when needed:
 
 ```bash
 ./scripts/run-ansible.sh predeploy-show-info --limit zabbix_agent_targets
-./scripts/run-ansible.sh predeploy-show-info --limit 172.16.3.21
+./scripts/run-ansible.sh predeploy-show-info --limit <target-host-or-ip>
 ```
 
 ## Variables
@@ -36,4 +36,3 @@ This playbook uses the inventory connection variables from `.env`, including:
 ## Expected Result
 
 The run should complete with only `ok` tasks and no `changed` tasks.
-

@@ -16,9 +16,9 @@ This task initializes Docker Swarm on the first manager and joins workers.
 ANSIBLE_DOCKER_SWARM_ENABLED=true
 ANSIBLE_DOCKER_SWARM_MANAGER_GROUP=swarm_managers
 ANSIBLE_DOCKER_SWARM_WORKER_GROUP=swarm_workers
-ANSIBLE_DOCKER_SWARM_LISTEN_ADDR=0.0.0.0:2377
+ANSIBLE_DOCKER_SWARM_LISTEN_ADDR=<listen-ip>:2377
 ANSIBLE_DOCKER_SWARM_PORT=2377
-ANSIBLE_DOCKER_SWARM_MANAGER_ADDR=172.16.5.57
+# ANSIBLE_DOCKER_SWARM_MANAGER_ADDR=<manager-ip>
 ANSIBLE_DOCKER_SWARM_FORCE_RESET=false
 ANSIBLE_DOCKER_SWARM_GROUP_LABELS="{}"
 ANSIBLE_DOCKER_SWARM_NODE_LABELS="{}"
@@ -55,4 +55,3 @@ On the manager:
 docker node ls
 docker node inspect <node-id> --format '{{ json .Spec.Labels }}'
 ```
-

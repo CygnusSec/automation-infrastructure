@@ -18,23 +18,11 @@ dns_server_container_name: dns-server
 dns_server_config_dir: "{{ dns_time_services_base_dir }}/bind"
 dns_server_cache_dir: "{{ dns_time_services_base_dir }}/bind-cache"
 dns_server_command: "named -g -c /etc/bind/named.conf"
-dns_server_allow_query:
-  - 172.16.0.0/16
+dns_server_allow_query: []
 dns_server_forwarders: []
 dns_server_extra_options: []
 dns_server_zone_serial: 1
-dns_server_zones:
-  - name: bcy.gov.vn
-    records:
-      - name: api
-        type: A
-        value: 172.16.3.100
-      - name: file
-        type: A
-        value: 172.16.3.100
-      - name: cache
-        type: A
-        value: 172.16.3.101
+dns_server_zones: []
 
 time_server_enabled: true
 time_server_image: local/chrony:offline
@@ -49,7 +37,6 @@ time_server_container_name: time-server
 time_server_config_dir: "{{ dns_time_services_base_dir }}/chrony"
 time_server_command: "chronyd -d -f /etc/chrony/chrony.conf"
 time_server_extra_docker_args: "--cap-add SYS_TIME --cap-add SYS_NICE"
-time_server_allow:
-  - 172.16.0.0/16
+time_server_allow: []
 time_server_upstream_servers: []
 time_server_local_stratum: 10

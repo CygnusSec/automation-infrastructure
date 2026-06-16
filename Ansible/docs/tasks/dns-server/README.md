@@ -16,10 +16,10 @@ This task deploys only the BIND DNS container.
 ANSIBLE_DNS_SERVER_ENABLED=true
 ANSIBLE_DNS_SERVER_IMAGE=local/bind9:offline
 ANSIBLE_DNS_SERVER_IMAGE_TAR=./repo/docker-images/bind9.tar
-ANSIBLE_DNS_SERVER_ALLOW_QUERY="[172.16.0.0/16]"
+ANSIBLE_DNS_SERVER_ALLOW_QUERY="[<allowed-cidr>]"
 ANSIBLE_DNS_SERVER_FORWARDERS="[]"
 ANSIBLE_DNS_SERVER_ZONE_SERIAL=1
-ANSIBLE_DNS_SERVER_ZONES="[{name: bcy.gov.vn, records: [{name: api, type: A, value: 172.16.3.100}, {name: file, type: A, value: 172.16.3.100}, {name: cache, type: A, value: 172.16.3.101}]}]"
+ANSIBLE_DNS_SERVER_ZONES="[{name: example.local, records: [{name: api, type: A, value: <app-ip>}, {name: file, type: A, value: <file-ip>}, {name: cache, type: A, value: <cache-ip>}]}]"
 ```
 
 ## Command
@@ -34,8 +34,7 @@ cd Ansible
 From a host that can reach the DNS server:
 
 ```bash
-dig @172.16.3.200 api.bcy.gov.vn
-dig @172.16.3.200 file.bcy.gov.vn
-dig @172.16.3.200 cache.bcy.gov.vn
+dig @<dns-server-ip> api.example.local
+dig @<dns-server-ip> file.example.local
+dig @<dns-server-ip> cache.example.local
 ```
-

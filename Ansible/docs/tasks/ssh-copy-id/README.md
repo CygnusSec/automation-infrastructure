@@ -34,7 +34,7 @@ cd Ansible
 Run against one target while testing:
 
 ```bash
-./scripts/run-ansible.sh ssh-copy-id --limit 172.16.3.21
+./scripts/run-ansible.sh ssh-copy-id --limit <target-host-or-ip>
 ```
 
 ## After Success
@@ -52,4 +52,3 @@ Then verify:
 ```bash
 ./scripts/run-ansible.sh predeploy-show-info --limit ssh_copy_id_targets
 ```
-

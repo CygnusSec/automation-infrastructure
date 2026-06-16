@@ -9,6 +9,8 @@ This task is run on an online machine to build an offline Ansible bundle.
 - downloads Zabbix Agent 2 `.deb` packages when enabled
 - saves the runtime image as `image-runtime/ansible-runtime.tar`
 - packages the Ansible project into `dist/ansible-base-offline-<timestamp>.tar.gz`
+- excludes local `.env`, `env.d/*.env`, SSH private/public keys, and local
+  secret YAML files from the packaged project
 
 ## Key Variables
 
@@ -36,4 +38,3 @@ Ansible/dist/ansible-base-offline-<timestamp>.tar.gz
 ```
 
 Copy the `.tar.gz` file to the offline control machine and extract it.
-

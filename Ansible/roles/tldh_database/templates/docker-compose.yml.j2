@@ -1,0 +1,37 @@
+version: "3.9"
+
+services:
+  trios_database:
+    image: {{ tldh_database_image }}
+    container_name: {{ tldh_database_container_name }}
+    restart: always
+    network_mode: "host"
+    environment:
+      MARIADB_ROOT_PASSWORD: "{{ tldh_database_root_password }}"
+      MARIADB_USER: "{{ tldh_database_app_user }}"
+      MARIADB_PASSWORD: "{{ tldh_database_app_password }}"
+      MARIADB_ROOT_HOST: "{{ tldh_database_root_host }}"
+{% if tldh_database_replication_user | length > 0 %}
+      MARIADB_REPLICATION_USER: "{{ tldh_database_replication_user }}"
+      MARIADB_REPLICATION_PASSWORD: "{{ tldh_database_replication_password }}"
+{% endif %}
+{% if tldh_database_role == 'slave' %}
+      MARIADB_MASTER_HOST: "{{ tldh_database_master_host }}"
+      MARIADB_MASTER_PORT: "{{ tldh_database_master_port }}"
+{% endif %}
+    deploy:
+      resources:
+        limits:
+          cpus: "{{ tldh_database_cpu_limit }}"
+          memory: "{{ tldh_database_memory_limit }}"
+        reservations:
+          cpus: "{{ tldh_database_cpu_reservation }}"
+          memory: "{{ tldh_database_memory_reservation }}"
+    ulimits:
+      nofile:
+        soft: {{ tldh_database_nofile_soft }}
+        hard: {{ tldh_database_nofile_hard }}
+    volumes:
+      - {{ tldh_database_data_dir }}:/var/lib/mysql:Z
+      - {{ tldh_database_config_dir }}/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh
+      - {{ tldh_database_config_dir }}/myV2.cnf:/etc/mysql/my.cnf

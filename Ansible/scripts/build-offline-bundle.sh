@@ -10,14 +10,9 @@ PROJECT_DIR="${BUNDLE_DIR}/project"
 IMAGE_DIR="${BUNDLE_DIR}/image-runtime"
 IMAGE_TAR="${IMAGE_DIR}/ansible-runtime.tar"
 
-ENV_FILE="${ROOT_DIR}/.env"
-
-if [[ -f "${ENV_FILE}" ]]; then
-  set -a
-  # shellcheck disable=SC1090
-  source "${ENV_FILE}"
-  set +a
-fi
+# shellcheck source=scripts/lib/env.sh
+source "${ROOT_DIR}/scripts/lib/env.sh"
+ANSIBLE_ENV_CONTEXT=offline_bundle load_ansible_env "${ROOT_DIR}"
 
 RUNTIME_IMAGE="${RUNTIME_IMAGE:-}"
 LOCAL_RUNTIME_IMAGE="${LOCAL_RUNTIME_IMAGE:-ansible-base-runtime:local}"
@@ -148,6 +143,10 @@ tar \
   --exclude='.git' \
   --exclude='.codex' \
   --exclude='dist' \
+  --exclude='./.env' \
+  --exclude='./env.d/*.env' \
+  --exclude='./inventories/customer-a/secrets/id_*' \
+  --exclude='./inventories/customer-a/secrets/*.yaml' \
   -C "${ROOT_DIR}" \
   -cf - \
   . | tar -C "${PROJECT_DIR}" -xf -
@@ -175,7 +174,8 @@ cd project
 ./scripts/prepare-offline-control.sh
 \`\`\`
 
-Edit \`project/.env\` for the target hosts and SSH settings, then run:
+Edit \`project/.env\` for common SSH/runtime settings. Edit
+\`project/env.d/*.env\` for inventory and task-specific settings, then run:
 
 \`\`\`bash
 ./scripts/run-ansible.sh deploy --syntax-check

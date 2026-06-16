@@ -43,7 +43,7 @@ Ansible/repo/docker/
 ## Verification
 
 ```bash
-./scripts/run-ansible.sh deploy --tags docker --limit 172.16.3.21
+./scripts/run-ansible.sh deploy --tags docker --limit <target-host-or-ip>
 ```
 
 Then SSH to the host and check:
@@ -52,4 +52,3 @@ Then SSH to the host and check:
 docker version
 docker compose version
 ```
-

@@ -4,10 +4,10 @@ This task installs and configures Zabbix Agent 2 on the configured agent hosts.
 
 ## Current Targeting
 
-The Zabbix server is:
+The Zabbix server is configured in the local env file:
 
 ```text
-172.16.5.57
+<zabbix-server-ip-or-dns>
 ```
 
 Agents are read from:
@@ -37,8 +37,8 @@ same hostname for every targeted agent.
 ```env
 ANSIBLE_ZABBIX_AGENT_ENABLED=true
 ANSIBLE_ZABBIX_AGENT_TARGET_GROUP=zabbix_agent_targets
-ANSIBLE_ZABBIX_SERVER_HOST=172.16.5.57
-ANSIBLE_ZABBIX_SERVER_ACTIVE=172.16.5.57
+# ANSIBLE_ZABBIX_SERVER_HOST=<zabbix-server-ip-or-dns>
+# ANSIBLE_ZABBIX_SERVER_ACTIVE=<zabbix-server-ip-or-dns>
 ANSIBLE_ZABBIX_AGENT_HOSTNAME=
 ANSIBLE_ZABBIX_AGENT_INSTALL_FROM_LOCAL_REPO=true
 ANSIBLE_ZABBIX_AGENT_REPO_SOURCE=./repo/zabbix
@@ -59,7 +59,7 @@ cd Ansible
 Run only one agent:
 
 ```bash
-./scripts/run-ansible.sh deploy --tags zabbix --limit 172.16.3.21
+./scripts/run-ansible.sh deploy --tags zabbix --limit <target-host-or-ip>
 ```
 
 ## Offline Notes

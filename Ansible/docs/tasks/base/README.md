@@ -23,11 +23,10 @@ cd Ansible
 Run only on one host while testing:
 
 ```bash
-./scripts/run-ansible.sh deploy --tags base --limit 172.16.3.21
+./scripts/run-ansible.sh deploy --tags base --limit <target-host-or-ip>
 ```
 
 ## Related Runbooks
 
 - [Prerequisite](../prerequisite/README.md)
 - [Docker](../docker/README.md)
-

@@ -6,7 +6,7 @@ The control machine is expected to be the Zabbix server. Set the server address
 with:
 
 ```env
-ANSIBLE_ZABBIX_SERVER_HOST=192.168.1.10
+# ANSIBLE_ZABBIX_SERVER_HOST=<zabbix-server-ip-or-dns>
 ```
 
 Keep the agent hostname empty for normal use:

@@ -111,6 +111,16 @@
   tags:
     - ntp_client
 
+- name: Deploy TLDH database
+  hosts: "{{ tldh_database_target_group | default('tldh_database_targets') }}"
+  gather_facts: false
+  become: true
+  roles:
+    - role: tldh_database
+      when: tldh_database_enabled | bool
+  tags:
+    - tldh_database
+
 - name: Mount external disks
   hosts: "{{ external_disk_target_group | default('external_disk_targets') }}"
   gather_facts: false

@@ -10,7 +10,7 @@ run iptables management.
 
 ```env
 ANSIBLE_DOCKER_SWARM_MANAGE_IPTABLES=true
-ANSIBLE_DOCKER_SWARM_IPTABLES_SOURCE_CIDR=172.16.0.0/16
+ANSIBLE_DOCKER_SWARM_IPTABLES_SOURCE_CIDR=<source-cidr>
 ANSIBLE_DOCKER_SWARM_MANAGE_ENCRYPTED_OVERLAY_ESP=false
 ANSIBLE_DOCKER_SWARM_SERVICE_PORTS="[]"
 ```
@@ -35,4 +35,3 @@ cd Ansible
 - `7946/udp` on manager and worker nodes
 - `4789/udp` on manager and worker nodes
 - protocol `esp` when encrypted overlay support is enabled
-

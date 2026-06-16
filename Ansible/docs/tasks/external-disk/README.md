@@ -24,7 +24,7 @@ running it.
 ```env
 ANSIBLE_EXTERNAL_DISK_ENABLED=true
 ANSIBLE_EXTERNAL_DISK_TARGET_GROUP=external_disk_targets
-ANSIBLE_EXTERNAL_DISK_HOSTS="172.16.5.57,172.16.4.11,172.16.4.12"
+# ANSIBLE_EXTERNAL_DISK_HOSTS="<disk-host-ip-1>,<disk-host-ip-2>"
 ANSIBLE_EXTERNAL_DISK_DEVICE=/dev/sdb
 ANSIBLE_EXTERNAL_DISK_PARTITION=/dev/sdb1
 ANSIBLE_EXTERNAL_DISK_MOUNT_PATH=/mnt/data
@@ -44,7 +44,7 @@ cd Ansible
 Test on one host first:
 
 ```bash
-./scripts/run-ansible.sh deploy --tags external_disk --limit 172.16.4.11
+./scripts/run-ansible.sh deploy --tags external_disk --limit <target-host-or-ip>
 ```
 
 ## Verification
@@ -54,4 +54,3 @@ lsblk -f
 findmnt /mnt/data
 cat /etc/fstab
 ```
-

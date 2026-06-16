@@ -32,6 +32,9 @@ providers/
 # Ansible local environment and artifacts
 Ansible/.env
 !Ansible/.env.example
+Ansible/env.d/*.env
+!Ansible/env.d/*.env.example
+!Ansible/env.d/README.md
 Ansible/dist/
 Ansible/*.retry
 Ansible/**/__pycache__/

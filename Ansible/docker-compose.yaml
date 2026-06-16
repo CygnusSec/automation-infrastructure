@@ -2,9 +2,25 @@ services:
   ansible:
     container_name: ansible-c
     hostname: ansible-c
-    image: ${RUNTIME_IMAGE:-${LOCAL_RUNTIME_IMAGE:-ansible-base-runtime:local}}
+    image: ${ANSIBLE_IMAGE:-${LOCAL_RUNTIME_IMAGE:-ansible-base-runtime:local}}
     env_file:
       - path: .env
+        required: false
+      - path: env.d/10-inventory.env
+        required: false
+      - path: env.d/20-base.env
+        required: false
+      - path: env.d/25-host-network.env
+        required: false
+      - path: env.d/30-zabbix-agent.env
+        required: false
+      - path: env.d/40-dns-time.env
+        required: false
+      - path: env.d/50-external-disk.env
+        required: false
+      - path: env.d/60-docker-swarm.env
+        required: false
+      - path: env.d/70-tldh-database.env
         required: false
     build:
       context: .

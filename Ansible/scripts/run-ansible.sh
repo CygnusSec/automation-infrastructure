@@ -16,15 +16,11 @@ if [[ $# -lt 1 ]]; then
 fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ENV_FILE="${ROOT_DIR}/.env"
 REQUESTED_PLAYBOOK="$1"
 
-if [[ -f "${ENV_FILE}" ]]; then
-  set -a
-  # shellcheck disable=SC1090
-  source "${ENV_FILE}"
-  set +a
-fi
+# shellcheck source=scripts/lib/env.sh
+source "${ROOT_DIR}/scripts/lib/env.sh"
+load_ansible_env "${ROOT_DIR}" "${@:2}"
 
 DEFAULT_ANSIBLE_IMAGE="ansible-base-runtime:local"
 LOCAL_RUNTIME_IMAGE="${LOCAL_RUNTIME_IMAGE:-${DEFAULT_ANSIBLE_IMAGE}}"
@@ -32,6 +28,12 @@ RUNTIME_IMAGE="${RUNTIME_IMAGE:-}"
 ANSIBLE_CONTROL_OFFLINE="${ANSIBLE_CONTROL_OFFLINE:-false}"
 ANSIBLE_SSH_PASSWORD_AUTH="${ANSIBLE_SSH_PASSWORD_AUTH_OVERRIDE:-${ANSIBLE_SSH_PASSWORD_AUTH:-false}}"
 export ANSIBLE_SSH_PASSWORD_AUTH
+
+if [[ "${RUNTIME_IMAGE}" == *.tar || "${RUNTIME_IMAGE}" == *.tar.gz ]]; then
+  echo "Ignoring RUNTIME_IMAGE tar path while running Ansible: ${RUNTIME_IMAGE}" >&2
+  echo "Load runtime image tars with ./scripts/prepare-offline-control.sh, then use LOCAL_RUNTIME_IMAGE." >&2
+  RUNTIME_IMAGE=""
+fi
 
 if [[ -n "${RUNTIME_IMAGE}" ]]; then
   ANSIBLE_IMAGE="${RUNTIME_IMAGE}"
@@ -92,6 +94,14 @@ DOCKER_ENV_ARGS=(
   "-e" "ANSIBLE_SSH_PASSWORD_AUTH=${ANSIBLE_SSH_PASSWORD_AUTH}"
 )
 
+while IFS='=' read -r env_name _; do
+  case "${env_name}" in
+    ANSIBLE_*)
+      DOCKER_ENV_ARGS+=("-e" "${env_name}")
+      ;;
+  esac
+done < <(env | sort)
+
 if [[ "${ANSIBLE_SSH_PASSWORD_AUTH}" == "true" && -n "${ANSIBLE_SSH_COMMON_ARGS:-}" ]]; then
   DOCKER_ENV_ARGS+=("-e" "ANSIBLE_SSH_COMMON_ARGS=${ANSIBLE_SSH_COMMON_ARGS}")
 fi
@@ -119,10 +129,10 @@ if ! docker image inspect "${ANSIBLE_IMAGE}" >/dev/null 2>&1; then
   if [[ "${USE_REGISTRY_IMAGE}" -eq 1 ]]; then
     docker pull "${ANSIBLE_IMAGE}"
   else
-    RUNTIME_IMAGE="${ANSIBLE_IMAGE}" LOCAL_RUNTIME_IMAGE="${LOCAL_RUNTIME_IMAGE}" \
+    ANSIBLE_IMAGE="${ANSIBLE_IMAGE}" LOCAL_RUNTIME_IMAGE="${LOCAL_RUNTIME_IMAGE}" \
       docker compose -f "${ROOT_DIR}/docker-compose.yaml" build ansible
   fi
 fi
 
-RUNTIME_IMAGE="${ANSIBLE_IMAGE}" LOCAL_RUNTIME_IMAGE="${LOCAL_RUNTIME_IMAGE}" \
+ANSIBLE_IMAGE="${ANSIBLE_IMAGE}" LOCAL_RUNTIME_IMAGE="${LOCAL_RUNTIME_IMAGE}" \
   docker compose -f "${ROOT_DIR}/docker-compose.yaml" run --rm "${DOCKER_ENV_ARGS[@]}" ansible ansible-playbook "${PLAYBOOK_PATH}" "${EXTRA_ARGS[@]}" "${@:2}"

@@ -67,6 +67,7 @@ Common task runbooks:
 - [DNS Server](docs/tasks/dns-server/README.md)
 - [Time Server](docs/tasks/time-server/README.md)
 - [NTP Client](docs/tasks/ntp-client/README.md)
+- [TLDH Database](docs/tasks/tldh-database/README.md)
 - [External Disk](docs/tasks/external-disk/README.md)
 - [Docker Swarm](docs/tasks/docker-swarm/README.md)
 - [Docker Swarm iptables](docs/tasks/docker-swarm-iptables/README.md)
@@ -94,8 +95,8 @@ The active inventory is dynamic:
 inventories/customer-a/inventory.py
 ```
 
-`ansible.cfg` points to this script. The script reads host lists from `.env` and
-generates Ansible groups such as:
+`ansible.cfg` points to this script. The script reads host lists from `.env`
+and `env.d/*.env`, then generates Ansible groups such as:
 
 - `all_targets`
 - `ssh_copy_id_targets`
@@ -109,23 +110,25 @@ generates Ansible groups such as:
 - `swarm_cache_int_workers`
 - `dns_time_servers`
 
-Set host lists in `.env`:
+Set host lists in `env.d/10-inventory.env`. Keep environment-specific values
+out of this README and use placeholder comments as a template:
 
 ```env
-ANSIBLE_ALL_TARGET_HOSTS="172.16.5.3,172.16.3.21"
-ANSIBLE_SWARM_MANAGER_HOSTS="172.16.5.3"
-ANSIBLE_SWARM_BACKEND_WORKER_HOSTS="172.16.3.21,172.16.3.22"
-ANSIBLE_SWARM_FILE_SERVER_WORKER_HOSTS="172.16.3.25,172.16.3.26"
-ANSIBLE_SWARM_CACHE_SERVER_EXT_HOSTS="172.16.3.27,172.16.3.37"
-ANSIBLE_SWARM_CACHE_SERVER_EXT_TAGS="cache-server-ext-01,cache-server-ext-02"
-ANSIBLE_SWARM_CACHE_SERVER_INT_HOSTS="172.16.4.17,172.16.4.18"
-ANSIBLE_SWARM_CACHE_SERVER_INT_TAGS="cache-server-int-01,cache-server-int-02"
-ANSIBLE_SSH_COPY_ID_EXTRA_HOSTS="172.16.3.24,172.16.3.28"
-ANSIBLE_ZABBIX_AGENT_HOSTS="172.16.3.21,172.16.3.22"
+# ANSIBLE_ALL_TARGET_HOSTS="<control-ip>,<worker-ip-1>"
+# ANSIBLE_SWARM_MANAGER_HOSTS="<manager-ip>"
+# ANSIBLE_SWARM_BACKEND_WORKER_HOSTS="<backend-ip-1>,<backend-ip-2>"
+# ANSIBLE_SWARM_FILE_SERVER_WORKER_HOSTS="<file-server-ip-1>,<file-server-ip-2>"
+# ANSIBLE_SWARM_CACHE_SERVER_EXT_HOSTS="<cache-ext-ip-1>,<cache-ext-ip-2>"
+# ANSIBLE_SWARM_CACHE_SERVER_EXT_TAGS="cache-server-ext-01,cache-server-ext-02"
+# ANSIBLE_SWARM_CACHE_SERVER_INT_HOSTS="<cache-int-ip-1>,<cache-int-ip-2>"
+# ANSIBLE_SWARM_CACHE_SERVER_INT_TAGS="cache-server-int-01,cache-server-int-02"
+# ANSIBLE_SSH_COPY_ID_EXTRA_HOSTS="<extra-ip-1>,<extra-ip-2>"
+# ANSIBLE_ZABBIX_AGENT_HOSTS="<agent-ip-1>,<agent-ip-2>"
 ```
 
 Cache tag variables map positionally to cache host variables. For example,
-`172.16.3.27` gets `node_tag=cache-server-ext-01`.
+the first host in `ANSIBLE_SWARM_CACHE_SERVER_EXT_HOSTS` gets
+`node_tag=cache-server-ext-01`.
 
 ## Secret
 
@@ -161,11 +164,51 @@ Environment-specific values are managed in:
 .env
 ```
 
+Use `.env` for common settings only:
+
+- runtime image and offline-control mode
+- SSH user and private key
+- optional first-run SSH password
+- optional sudo/become password
+- secret vars file path
+
+Task-specific values are split into:
+
+```text
+env.d/*.env
+```
+
+`scripts/run-ansible.sh` loads `.env` first. When you run with `--tags`, it
+loads `env.d/10-inventory.env` plus the env file mapped to those tags. When you
+run without `--tags`, it loads all `env.d/*.env` files. Real `env.d/*.env`
+files are ignored by git; tracked templates live beside them as
+`*.env.example`.
+
 Start from the example file:
 
 ```bash
 cp .env.example .env
 ```
+
+Create task env files from templates when needed:
+
+```bash
+cp env.d/10-inventory.env.example env.d/10-inventory.env
+cp env.d/30-zabbix-agent.env.example env.d/30-zabbix-agent.env
+cp env.d/70-tldh-database.env.example env.d/70-tldh-database.env
+```
+
+Tag-to-env mapping:
+
+| Tags | Env file |
+| --- | --- |
+| `base`, `prerequisite`, `docker` | `env.d/20-base.env` |
+| `hostname`, `network` | `env.d/25-host-network.env` |
+| `zabbix`, `zabbix_agent`, `zabbix_agent_uninstall` | `env.d/30-zabbix-agent.env` |
+| `dns_time_services`, `dns_server`, `time_server`, `ntp_client` | `env.d/40-dns-time.env` |
+| `external_disk` | `env.d/50-external-disk.env` |
+| `docker_swarm`, `docker_swarm_iptables` | `env.d/60-docker-swarm.env` |
+| `tldh_database` | `env.d/70-tldh-database.env` |
 
 Ansible variables are mapped from environment variables in:
 
@@ -173,8 +216,9 @@ Ansible variables are mapped from environment variables in:
 inventories/customer-a/group_vars/all.yaml
 ```
 
-The Docker wrapper loads `.env`, passes it into the Ansible runtime container,
-and the inventory/group variables read values with `lookup('env', ...)`.
+The Docker wrapper loads the selected environment files, passes the resulting
+`ANSIBLE_*` variables into the Ansible runtime container, and the
+inventory/group variables read values with `lookup('env', ...)`.
 
 Main variable groups:
 
@@ -188,22 +232,17 @@ Main variable groups:
 - `dns_server_*`
 - `time_server_*`
 - `ntp_client_*`
+- `tldh_database_*`
 - `external_disk_*`
 
-Common environment variables:
+Common `.env` variables:
 
 ```env
-ANSIBLE_MANAGER_1_HOST=192.168.1.143
 ANSIBLE_SSH_USER=ubuntu
 ANSIBLE_SSH_PRIVATE_KEY_FILE=./inventories/customer-a/secrets/id_rsa
 ANSIBLE_SSH_COPY_ID_PUBLIC_KEY_FILE=./inventories/customer-a/secrets/id_rsa.pub
-ANSIBLE_HOSTNAME_VALUE=ubuntu-proxmox-01-vm
-ANSIBLE_NETWORK_INTERFACE=ens34
-ANSIBLE_NETWORK_IPV4_ADDRESS=192.168.1.151
-ANSIBLE_NETWORK_IPV4_GATEWAY=192.168.1.1
-ANSIBLE_DOCKER_SWARM_ENABLED=true
-ANSIBLE_ZABBIX_AGENT_ENABLED=true
-ANSIBLE_ZABBIX_SERVER_HOST=192.168.1.10
+ANSIBLE_BECOME=true
+ANSIBLE_BECOME_METHOD=sudo
 ```
 
 For offline runs, prepare:
@@ -218,7 +257,7 @@ Use these steps for the current Docker-based Ansible workflow.
 
 ### 1. Prepare `.env`
 
-Start from the example when `.env` does not exist:
+Start from the common example when `.env` does not exist:
 
 ```bash
 cp .env.example .env
@@ -255,6 +294,17 @@ ANSIBLE_SSH_PASSWORD_AUTH=false
 ANSIBLE_PASSWORD=
 ANSIBLE_BECOME_PASSWORD=
 ```
+
+Create task env files from the templates you need:
+
+```bash
+cp env.d/10-inventory.env.example env.d/10-inventory.env
+cp env.d/20-base.env.example env.d/20-base.env
+cp env.d/30-zabbix-agent.env.example env.d/30-zabbix-agent.env
+```
+
+For example, `./scripts/run-ansible.sh deploy --tags zabbix` loads `.env`,
+`env.d/10-inventory.env`, and `env.d/30-zabbix-agent.env`.
 
 ### 2. Prepare the Runtime Image
 
@@ -419,10 +469,13 @@ Prepare the control machine:
 
 ```bash
 cp .env.example .env
+cp env.d/10-inventory.env.example env.d/10-inventory.env
+cp env.d/20-base.env.example env.d/20-base.env
 ```
 
-Edit `.env` for the target hosts, SSH key, hostname, network settings, and
-Swarm settings. Put the SSH private key and optional sudo password under:
+Edit `.env` for common SSH/runtime settings. Edit `env.d/10-inventory.env` for
+host lists and create the task env files needed for the tags you will run. Put
+the SSH private key and optional sudo password under:
 
 ```text
 inventories/customer-a/secrets/
@@ -449,6 +502,7 @@ On the online build machine:
 
 ```bash
 cp .env.example .env
+cp env.d/90-offline-bundle.env.example env.d/90-offline-bundle.env
 ./scripts/build-offline-bundle.sh
 ```
 
@@ -478,8 +532,8 @@ zabbix-agent2-plugin-postgresql
 ```
 
 Override `ANSIBLE_ZABBIX_AGENT_RELEASE_URL` and
-`ANSIBLE_ZABBIX_AGENT_OFFLINE_PACKAGES` in `.env` if you need a different
-Ubuntu or Zabbix version.
+`ANSIBLE_ZABBIX_AGENT_OFFLINE_PACKAGES` in `env.d/90-offline-bundle.env` if you
+need a different Ubuntu or Zabbix version.
 
 This creates:
 
@@ -497,7 +551,8 @@ cd project
 ```
 
 The prepare script loads `../image-runtime/ansible-runtime.tar`, creates `.env`
-from `.env.example` when needed, sets `ANSIBLE_CONTROL_OFFLINE=true`, and pins
+from `.env.example` when needed, creates missing `env.d/[0-7][0-9]-*.env`
+files from their examples, sets `ANSIBLE_CONTROL_OFFLINE=true`, and pins
 `LOCAL_RUNTIME_IMAGE` to the packaged image name.
 
 Before running offline, make sure these items are already present:
@@ -554,13 +609,13 @@ Configure Zabbix Agent:
 Change hostname:
 
 ```bash
-./scripts/run-ansible.sh deploy --tags hostname --limit 192.168.1.143
+./scripts/run-ansible.sh deploy --tags hostname --limit <target-host-or-ip>
 ```
 
 Change IP:
 
 ```bash
-./scripts/run-ansible.sh deploy --tags network --limit 192.168.1.143
+./scripts/run-ansible.sh deploy --tags network --limit <target-host-or-ip>
 ```
 
 Create or join Docker Swarm:
@@ -605,39 +660,40 @@ hostname_value: "ubuntu-proxmox-01-vm"
 
 network_manage: true
 network_interface: "eth0"
-network_ipv4_address: "192.168.1.151"
+network_ipv4_address: "<target-ip>"
 network_ipv4_prefix_length: 24
-network_ipv4_gateway: "192.168.1.1"
+network_ipv4_gateway: "<gateway-ip>"
 network_dns_servers:
-  - 192.168.1.1
-  - 8.8.8.8
+  - "<dns-ip-1>"
+  - "<dns-ip-2>"
 ```
 
 Notes:
 
 - changing the hostname is usually safer than changing the IP address
 - change IP addresses one host at a time
-- after changing an IP address, update the matching host list in `.env`
+- after changing an IP address, update the matching host list in `env.d/10-inventory.env`
 - the `network` role backs up `50-cloud-init.yaml` to `50-cloud-init.yaml.ansible.bak` when the file exists, then uses the new Netplan configuration to replace the old one
 
 ## Docker Swarm
 
 To run the Swarm role, the inventory needs manager and worker groups. With the
 current dynamic inventory, define these groups with the `ANSIBLE_SWARM_*`
-variables in `.env`. Static inventories can use a layout like this:
+variables in `env.d/10-inventory.env`. Static inventories can use a layout
+like this:
 
 ```ini
 [swarm_managers]
-192.168.1.151 docker_swarm_advertise_addr=192.168.1.151
+manager-01 ansible_host=<manager-ip> docker_swarm_advertise_addr=<manager-ip>
 
 [swarm_app_workers]
-192.168.1.152 docker_swarm_advertise_addr=192.168.1.152
-192.168.1.153 docker_swarm_advertise_addr=192.168.1.153
-192.168.1.154 docker_swarm_advertise_addr=192.168.1.154
+app-worker-01 ansible_host=<app-worker-ip-1> docker_swarm_advertise_addr=<app-worker-ip-1>
+app-worker-02 ansible_host=<app-worker-ip-2> docker_swarm_advertise_addr=<app-worker-ip-2>
+app-worker-03 ansible_host=<app-worker-ip-3> docker_swarm_advertise_addr=<app-worker-ip-3>
 
 [swarm_data_workers]
-192.168.1.155 docker_swarm_advertise_addr=192.168.1.155
-192.168.1.156 docker_swarm_advertise_addr=192.168.1.156
+data-worker-01 ansible_host=<data-worker-ip-1> docker_swarm_advertise_addr=<data-worker-ip-1>
+data-worker-02 ansible_host=<data-worker-ip-2> docker_swarm_advertise_addr=<data-worker-ip-2>
 
 [swarm_workers:children]
 swarm_app_workers
@@ -650,12 +706,12 @@ Common variables:
 docker_swarm_enabled: true
 docker_swarm_manager_group: swarm_managers
 docker_swarm_worker_group: swarm_workers
-docker_swarm_listen_addr: "0.0.0.0:2377"
+docker_swarm_listen_addr: "<listen-ip>:2377"
 docker_swarm_port: 2377
 docker_swarm_force_reset: false
 docker_swarm_manager_addr: ""
 docker_swarm_manage_iptables: false
-docker_swarm_iptables_source_cidr: "0.0.0.0/0"
+docker_swarm_iptables_source_cidr: "<source-cidr>"
 docker_swarm_manage_encrypted_overlay_esp: false
 docker_swarm_service_ports:
   - port: 80
@@ -696,18 +752,19 @@ node.
 The Ansible control machine is treated as the Zabbix server. Target hosts get a
 Zabbix Agent configuration that points back to that control machine.
 
-Set these values in `.env`:
+Set these values in `env.d/30-zabbix-agent.env`. Use comments as a template
+and fill the real server address only in your local env file:
 
 ```env
-ANSIBLE_ZABBIX_AGENT_ENABLED=true
-ANSIBLE_ZABBIX_SERVER_HOST=192.168.1.10
-ANSIBLE_ZABBIX_AGENT_HOSTNAME=
-ANSIBLE_ZABBIX_AGENT_MANAGE_APT_REPO=true
-ANSIBLE_ZABBIX_AGENT_RELEASE_URL=https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb
-ANSIBLE_ZABBIX_AGENT_PACKAGES=[zabbix-agent2, zabbix-agent2-plugin-mongodb, zabbix-agent2-plugin-mssql, zabbix-agent2-plugin-postgresql]
-ANSIBLE_ZABBIX_AGENT_SERVICE_NAME=zabbix-agent2
-ANSIBLE_ZABBIX_AGENT_CONFIG_FILE=/etc/zabbix/zabbix_agent2.conf
-ANSIBLE_ZABBIX_AGENT_REMOVE_LEGACY_AGENT=true
+# ANSIBLE_ZABBIX_AGENT_ENABLED=true
+# ANSIBLE_ZABBIX_SERVER_HOST=<zabbix-server-ip-or-dns>
+# ANSIBLE_ZABBIX_AGENT_HOSTNAME=
+# ANSIBLE_ZABBIX_AGENT_MANAGE_APT_REPO=true
+# ANSIBLE_ZABBIX_AGENT_RELEASE_URL=https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb
+# ANSIBLE_ZABBIX_AGENT_PACKAGES=[zabbix-agent2, zabbix-agent2-plugin-mongodb, zabbix-agent2-plugin-mssql, zabbix-agent2-plugin-postgresql]
+# ANSIBLE_ZABBIX_AGENT_SERVICE_NAME=zabbix-agent2
+# ANSIBLE_ZABBIX_AGENT_CONFIG_FILE=/etc/zabbix/zabbix_agent2.conf
+# ANSIBLE_ZABBIX_AGENT_REMOVE_LEGACY_AGENT=true
 ```
 
 `ANSIBLE_ZABBIX_SERVER_HOST` must be the IP address or DNS name of the control
@@ -767,10 +824,11 @@ The target hosts must already have Docker installed and running. This role only
 loads service images from tar files and starts containers; it does not install
 Docker or any native DNS/time packages.
 
-Default target hosts:
+Target hosts are configured in `env.d/10-inventory.env` or
+`env.d/40-dns-time.env`:
 
 ```env
-ANSIBLE_DNS_TIME_SERVER_HOSTS="172.16.3.200,172.16.3.201"
+# ANSIBLE_DNS_TIME_SERVER_HOSTS="<dns-time-ip-1>,<dns-time-ip-2>"
 ```
 
 Default local image tar paths:
@@ -800,25 +858,25 @@ build/time-server.Dockerfile
 ```
 
 Then saves them into `repo/docker-images/` before packaging the bundle. Set the
-matching image names in `.env`:
+matching image names in `env.d/40-dns-time.env`:
 
 ```env
-ANSIBLE_DNS_TIME_SERVICES_ENABLED=true
-ANSIBLE_DNS_TIME_SERVER_HOSTS="172.16.3.200,172.16.3.201"
-ANSIBLE_DNS_TIME_SERVICES_LOAD_IMAGES=true
-ANSIBLE_DNS_TIME_SERVICES_BUILD_IMAGES=true
-
-ANSIBLE_DNS_SERVER_IMAGE=local/bind9:offline
-ANSIBLE_DNS_SERVER_IMAGE_TAR=./repo/docker-images/bind9.tar
-ANSIBLE_DNS_SERVER_ALLOW_QUERY="[172.16.0.0/16]"
-ANSIBLE_DNS_SERVER_FORWARDERS=[]
-ANSIBLE_DNS_SERVER_ZONE_SERIAL=1
-ANSIBLE_DNS_SERVER_ZONES="[{name: bcy.gov.vn, records: [{name: api, type: A, value: 172.16.3.100}, {name: file, type: A, value: 172.16.3.100}, {name: cache, type: A, value: 172.16.3.101}]}]"
-
-ANSIBLE_TIME_SERVER_IMAGE=local/chrony:offline
-ANSIBLE_TIME_SERVER_IMAGE_TAR=./repo/docker-images/chrony.tar
-ANSIBLE_TIME_SERVER_ALLOW="[172.16.0.0/16]"
-ANSIBLE_TIME_SERVER_UPSTREAM_SERVERS=[]
+# ANSIBLE_DNS_TIME_SERVICES_ENABLED=true
+# ANSIBLE_DNS_TIME_SERVER_HOSTS="<dns-time-ip-1>,<dns-time-ip-2>"
+# ANSIBLE_DNS_TIME_SERVICES_LOAD_IMAGES=true
+# ANSIBLE_DNS_TIME_SERVICES_BUILD_IMAGES=true
+#
+# ANSIBLE_DNS_SERVER_IMAGE=local/bind9:offline
+# ANSIBLE_DNS_SERVER_IMAGE_TAR=./repo/docker-images/bind9.tar
+# ANSIBLE_DNS_SERVER_ALLOW_QUERY="[<allowed-cidr>]"
+# ANSIBLE_DNS_SERVER_FORWARDERS=[]
+# ANSIBLE_DNS_SERVER_ZONE_SERIAL=1
+# ANSIBLE_DNS_SERVER_ZONES="[{name: example.local, records: [{name: api, type: A, value: <app-ip>}, {name: file, type: A, value: <file-ip>}, {name: cache, type: A, value: <cache-ip>}]}]"
+#
+# ANSIBLE_TIME_SERVER_IMAGE=local/chrony:offline
+# ANSIBLE_TIME_SERVER_IMAGE_TAR=./repo/docker-images/chrony.tar
+# ANSIBLE_TIME_SERVER_ALLOW="[<allowed-cidr>]"
+# ANSIBLE_TIME_SERVER_UPSTREAM_SERVERS=[]
 ```
 
 The image tag in each tar file must match the configured image name. For
@@ -829,20 +887,20 @@ provide `named` and the time image to provide `chronyd`.
 The containers run with host networking so DNS listens on port `53` and the
 time service listens on UDP port `123` on the target host.
 
-Default DNS records:
+Example DNS records:
 
 ```text
-api.bcy.gov.vn    A 172.16.3.100
-file.bcy.gov.vn   A 172.16.3.100
-cache.bcy.gov.vn  A 172.16.3.101
+api.example.local    A <app-ip>
+file.example.local   A <file-ip>
+cache.example.local  A <cache-ip>
 ```
 
 Verify DNS lookup from a client:
 
 ```bash
-dig @172.16.3.200 api.bcy.gov.vn +short
-dig @172.16.3.200 file.bcy.gov.vn +short
-dig @172.16.3.200 cache.bcy.gov.vn +short
+dig @<dns-server-ip> api.example.local +short
+dig @<dns-server-ip> file.example.local +short
+dig @<dns-server-ip> cache.example.local +short
 ```
 
 Run only DNS and time services:
@@ -860,14 +918,14 @@ Run only one side:
 
 ## NTP Clients
 
-After the time server containers are running on `172.16.3.200` and
-`172.16.3.201`, configure the remaining servers as NTP clients:
+After the time server containers are running, configure the remaining servers
+as NTP clients:
 
 ```env
-ANSIBLE_NTP_CLIENT_ENABLED=true
-ANSIBLE_NTP_CLIENT_TARGET_GROUP=all_targets:!dns_time_servers
-ANSIBLE_NTP_CLIENT_SERVERS="[172.16.3.200, 172.16.3.201]"
-ANSIBLE_NTP_CLIENT_FALLBACK_SERVERS=[]
+# ANSIBLE_NTP_CLIENT_ENABLED=true
+# ANSIBLE_NTP_CLIENT_TARGET_GROUP=all_targets:!dns_time_servers
+# ANSIBLE_NTP_CLIENT_SERVERS="[<time-server-ip-1>, <time-server-ip-2>]"
+# ANSIBLE_NTP_CLIENT_FALLBACK_SERVERS=[]
 ```
 
 Run only NTP client configuration:
@@ -891,10 +949,10 @@ repository before running this role.
 Use the `external_disk` role to partition, format, and mount a dedicated data
 disk on selected hosts.
 
-Current target hosts:
+Target hosts are configured in `env.d/50-external-disk.env`:
 
 ```env
-ANSIBLE_EXTERNAL_DISK_HOSTS="172.16.5.57,172.16.4.11,172.16.4.12,172.16.4.13,172.16.4.14,172.16.4.15,172.16.4.16,172.16.4.17,172.16.4.18,172.16.3.28,172.16.3.38"
+# ANSIBLE_EXTERNAL_DISK_HOSTS="<disk-host-ip-1>,<disk-host-ip-2>"
 ```
 
 Disk settings:

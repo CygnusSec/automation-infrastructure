@@ -10,17 +10,17 @@ session.
 ```env
 ANSIBLE_NETWORK_MANAGE=true
 ANSIBLE_NETWORK_INTERFACE=ens34
-ANSIBLE_NETWORK_IPV4_ADDRESS=172.16.3.21
+ANSIBLE_NETWORK_IPV4_ADDRESS=<target-ip>
 ANSIBLE_NETWORK_IPV4_PREFIX_LENGTH=24
-ANSIBLE_NETWORK_IPV4_GATEWAY=172.16.3.1
-ANSIBLE_NETWORK_DNS_SERVERS="[172.16.3.200, 172.16.3.201]"
+ANSIBLE_NETWORK_IPV4_GATEWAY=<gateway-ip>
+ANSIBLE_NETWORK_DNS_SERVERS="[<dns-ip-1>, <dns-ip-2>]"
 ```
 
 ## Command
 
 ```bash
 cd Ansible
-./scripts/run-ansible.sh deploy --tags network --limit 172.16.3.21
+./scripts/run-ansible.sh deploy --tags network --limit <target-host-or-ip>
 ```
 
 ## Safety Notes
@@ -28,4 +28,3 @@ cd Ansible
 - Test one host at a time.
 - Make sure the target host is reachable at the new address.
 - Update `.env` inventory host lists after changing IP addresses.
-

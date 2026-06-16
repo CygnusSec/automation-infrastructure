@@ -6,6 +6,10 @@ the exact command to run it through `scripts/run-ansible.sh`.
 Run all commands from the `Ansible/` directory unless the runbook says
 otherwise.
 
+Environment values can stay in `.env`, or be split into task-specific
+`env.d/*.env` files. The runner loads `.env` first and then `env.d/*.env` in
+alphabetic order.
+
 ## Task Index
 
 | Task | Purpose | Main command |
@@ -23,9 +27,9 @@ otherwise.
 | [DNS Server](dns-server/README.md) | Deploy only the BIND DNS container. | `./scripts/run-ansible.sh deploy --tags dns_server` |
 | [Time Server](time-server/README.md) | Deploy only the Chrony time server container. | `./scripts/run-ansible.sh deploy --tags time_server` |
 | [NTP Client](ntp-client/README.md) | Point targets to the internal time servers. | `./scripts/run-ansible.sh deploy --tags ntp_client` |
+| [TLDH Database](tldh-database/README.md) | Deploy MariaDB master/slave containers. | `./scripts/run-ansible.sh deploy --tags tldh_database` |
 | [External Disk](external-disk/README.md) | Partition, format, mount, and persist an external disk. | `./scripts/run-ansible.sh deploy --tags external_disk` |
 | [Docker Swarm](docker-swarm/README.md) | Initialize Swarm and join worker nodes. | `./scripts/run-ansible.sh deploy --tags docker_swarm` |
 | [Docker Swarm iptables](docker-swarm-iptables/README.md) | Open Swarm and published service ports. | `./scripts/run-ansible.sh deploy --tags docker_swarm_iptables` |
 | [Offline Bundle Build](offline-bundle/README.md) | Build a portable offline Ansible bundle on an online machine. | `./scripts/build-offline-bundle.sh` |
 | [Offline Control Prepare](offline-control/README.md) | Load the packaged runtime image on the offline control machine. | `./scripts/prepare-offline-control.sh` |
-

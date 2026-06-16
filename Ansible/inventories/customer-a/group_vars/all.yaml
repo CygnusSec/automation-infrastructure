@@ -90,22 +90,44 @@ dns_time_services_base_dir: "{{ lookup('env', 'ANSIBLE_DNS_TIME_SERVICES_BASE_DI
 dns_server_enabled: "{{ (lookup('env', 'ANSIBLE_DNS_SERVER_ENABLED') | default('true', true)) | bool }}"
 dns_server_image: "{{ lookup('env', 'ANSIBLE_DNS_SERVER_IMAGE') | default('local/bind9:offline', true) }}"
 dns_server_image_tar: "{{ lookup('env', 'ANSIBLE_DNS_SERVER_IMAGE_TAR') | default('./repo/docker-images/bind9.tar', true) }}"
-dns_server_allow_query: "{{ lookup('env', 'ANSIBLE_DNS_SERVER_ALLOW_QUERY') | default('[172.16.0.0/16]', true) | from_yaml }}"
+dns_server_allow_query: "{{ lookup('env', 'ANSIBLE_DNS_SERVER_ALLOW_QUERY') | default('[]', true) | from_yaml }}"
 dns_server_forwarders: "{{ lookup('env', 'ANSIBLE_DNS_SERVER_FORWARDERS') | default('[]', true) | from_yaml }}"
 dns_server_zone_serial: "{{ (lookup('env', 'ANSIBLE_DNS_SERVER_ZONE_SERIAL') | default('1', true)) | int }}"
-dns_server_zones: "{{ lookup('env', 'ANSIBLE_DNS_SERVER_ZONES') | default('[{name: bcy.gov.vn, records: [{name: api, type: A, value: 172.16.3.100}, {name: file, type: A, value: 172.16.3.100}, {name: cache, type: A, value: 172.16.3.101}]}]', true) | from_yaml }}"
+dns_server_zones: "{{ lookup('env', 'ANSIBLE_DNS_SERVER_ZONES') | default('[]', true) | from_yaml }}"
 time_server_enabled: "{{ (lookup('env', 'ANSIBLE_TIME_SERVER_ENABLED') | default('true', true)) | bool }}"
 time_server_image: "{{ lookup('env', 'ANSIBLE_TIME_SERVER_IMAGE') | default('local/chrony:offline', true) }}"
 time_server_image_tar: "{{ lookup('env', 'ANSIBLE_TIME_SERVER_IMAGE_TAR') | default('./repo/docker-images/chrony.tar', true) }}"
-time_server_allow: "{{ lookup('env', 'ANSIBLE_TIME_SERVER_ALLOW') | default('[172.16.0.0/16]', true) | from_yaml }}"
+time_server_allow: "{{ lookup('env', 'ANSIBLE_TIME_SERVER_ALLOW') | default('[]', true) | from_yaml }}"
 time_server_upstream_servers: "{{ lookup('env', 'ANSIBLE_TIME_SERVER_UPSTREAM_SERVERS') | default('[]', true) | from_yaml }}"
 time_server_local_stratum: "{{ (lookup('env', 'ANSIBLE_TIME_SERVER_LOCAL_STRATUM') | default('10', true)) | int }}"
 
 # NTP client role
 ntp_client_enabled: "{{ (lookup('env', 'ANSIBLE_NTP_CLIENT_ENABLED') | default('false', true)) | bool }}"
 ntp_client_target_group: "{{ lookup('env', 'ANSIBLE_NTP_CLIENT_TARGET_GROUP') | default('all_targets:!dns_time_servers', true) }}"
-ntp_client_servers: "{{ lookup('env', 'ANSIBLE_NTP_CLIENT_SERVERS') | default('[172.16.3.200, 172.16.3.201]', true) | from_yaml }}"
+ntp_client_servers: "{{ lookup('env', 'ANSIBLE_NTP_CLIENT_SERVERS') | default('[]', true) | from_yaml }}"
 ntp_client_fallback_servers: "{{ lookup('env', 'ANSIBLE_NTP_CLIENT_FALLBACK_SERVERS') | default('[]', true) | from_yaml }}"
+
+# TLDH database role
+tldh_database_enabled: "{{ (lookup('env', 'ANSIBLE_TLDH_DATABASE_ENABLED') | default('false', true)) | bool }}"
+tldh_database_target_group: "{{ lookup('env', 'ANSIBLE_TLDH_DATABASE_TARGET_GROUP') | default('tldh_database_targets', true) }}"
+tldh_database_master_group: "{{ lookup('env', 'ANSIBLE_TLDH_DATABASE_MASTER_GROUP') | default('tldh_database_masters', true) }}"
+tldh_database_slave_group: "{{ lookup('env', 'ANSIBLE_TLDH_DATABASE_SLAVE_GROUP') | default('tldh_database_slaves', true) }}"
+tldh_database_base_dir: "{{ lookup('env', 'ANSIBLE_TLDH_DATABASE_BASE_DIR') | default('/opt/tldh-data', true) }}"
+tldh_database_config_dir: "{{ lookup('env', 'ANSIBLE_TLDH_DATABASE_CONFIG_DIR') | default(tldh_database_base_dir ~ '/config', true) }}"
+tldh_database_data_dir: "{{ lookup('env', 'ANSIBLE_TLDH_DATABASE_DATA_DIR') | default('/mnt/data/mysql', true) }}"
+tldh_database_image: "{{ lookup('env', 'ANSIBLE_TLDH_DATABASE_IMAGE') | default('registry.bcy.gov.vn/tldh/mariadb:10.7', true) }}"
+tldh_database_image_tar: "{{ lookup('env', 'ANSIBLE_TLDH_DATABASE_IMAGE_TAR') | default('', true) }}"
+tldh_database_load_image: "{{ (lookup('env', 'ANSIBLE_TLDH_DATABASE_LOAD_IMAGE') | default('false', true)) | bool }}"
+tldh_database_root_password: "{{ lookup('env', 'ANSIBLE_TLDH_DATABASE_ROOT_PASSWORD') | default('', true) }}"
+tldh_database_app_user: "{{ lookup('env', 'ANSIBLE_TLDH_DATABASE_APP_USER') | default('', true) }}"
+tldh_database_app_password: "{{ lookup('env', 'ANSIBLE_TLDH_DATABASE_APP_PASSWORD') | default('', true) }}"
+tldh_database_root_host: "{{ lookup('env', 'ANSIBLE_TLDH_DATABASE_ROOT_HOST') | default('%', true) }}"
+tldh_database_replication_user: "{{ lookup('env', 'ANSIBLE_TLDH_DATABASE_REPLICATION_USER') | default('replica', true) }}"
+tldh_database_replication_password: "{{ lookup('env', 'ANSIBLE_TLDH_DATABASE_REPLICATION_PASSWORD') | default('', true) }}"
+tldh_database_master_host: "{{ lookup('env', 'ANSIBLE_TLDH_DATABASE_MASTER_HOST') | default('', true) }}"
+tldh_database_master_port: "{{ (lookup('env', 'ANSIBLE_TLDH_DATABASE_MASTER_PORT') | default('3306', true)) | int }}"
+tldh_database_master_server_id: "{{ (lookup('env', 'ANSIBLE_TLDH_DATABASE_MASTER_SERVER_ID') | default('1', true)) | int }}"
+tldh_database_slave_server_id: "{{ (lookup('env', 'ANSIBLE_TLDH_DATABASE_SLAVE_SERVER_ID') | default('2', true)) | int }}"
 
 # External disk role
 external_disk_enabled: "{{ (lookup('env', 'ANSIBLE_EXTERNAL_DISK_ENABLED') | default('false', true)) | bool }}"
@@ -119,17 +141,17 @@ external_disk_create_partition: "{{ (lookup('env', 'ANSIBLE_EXTERNAL_DISK_CREATE
 external_disk_format: "{{ (lookup('env', 'ANSIBLE_EXTERNAL_DISK_FORMAT') | default('true', true)) | bool }}"
 
 # Hostname role
-hostname_manage: "{{ (lookup('env', 'ANSIBLE_HOSTNAME_MANAGE') | default('true', true)) | bool }}"
-hostname_value: "{{ lookup('env', 'ANSIBLE_HOSTNAME_VALUE') | default('ubuntu-proxmox-01-vm', true) }}"
+hostname_manage: "{{ (lookup('env', 'ANSIBLE_HOSTNAME_MANAGE') | default('false', true)) | bool }}"
+hostname_value: "{{ lookup('env', 'ANSIBLE_HOSTNAME_VALUE') | default('', true) }}"
 hostname_domain: "{{ lookup('env', 'ANSIBLE_HOSTNAME_DOMAIN') | default('', true) }}"
 
 # Network role
-network_manage: "{{ (lookup('env', 'ANSIBLE_NETWORK_MANAGE') | default('true', true)) | bool }}"
-network_interface: "{{ lookup('env', 'ANSIBLE_NETWORK_INTERFACE') | default('ens34', true) }}"
-network_ipv4_address: "{{ lookup('env', 'ANSIBLE_NETWORK_IPV4_ADDRESS') | default('192.168.1.151', true) }}"
+network_manage: "{{ (lookup('env', 'ANSIBLE_NETWORK_MANAGE') | default('false', true)) | bool }}"
+network_interface: "{{ lookup('env', 'ANSIBLE_NETWORK_INTERFACE') | default('', true) }}"
+network_ipv4_address: "{{ lookup('env', 'ANSIBLE_NETWORK_IPV4_ADDRESS') | default('', true) }}"
 network_ipv4_prefix_length: "{{ (lookup('env', 'ANSIBLE_NETWORK_IPV4_PREFIX_LENGTH') | default('24', true)) | int }}"
-network_ipv4_gateway: "{{ lookup('env', 'ANSIBLE_NETWORK_IPV4_GATEWAY') | default('192.168.1.1', true) }}"
-network_dns_servers: "{{ lookup('env', 'ANSIBLE_NETWORK_DNS_SERVERS') | default('[192.168.1.1, 8.8.8.8]', true) | from_yaml }}"
+network_ipv4_gateway: "{{ lookup('env', 'ANSIBLE_NETWORK_IPV4_GATEWAY') | default('', true) }}"
+network_dns_servers: "{{ lookup('env', 'ANSIBLE_NETWORK_DNS_SERVERS') | default('[]', true) | from_yaml }}"
 
 # Docker Swarm role
 docker_swarm_enabled: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_ENABLED') | default('true', true)) | bool }}"

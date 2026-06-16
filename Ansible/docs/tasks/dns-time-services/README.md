@@ -15,7 +15,7 @@ This task deploys DNS and time server containers on `dns_time_servers`.
 ```env
 ANSIBLE_DNS_TIME_SERVICES_ENABLED=true
 ANSIBLE_DNS_TIME_SERVICES_TARGET_GROUP=dns_time_servers
-ANSIBLE_DNS_TIME_SERVER_HOSTS="172.16.3.200,172.16.3.201"
+# ANSIBLE_DNS_TIME_SERVER_HOSTS="<dns-time-ip-1>,<dns-time-ip-2>"
 ANSIBLE_DNS_TIME_SERVICES_LOAD_IMAGES=true
 ANSIBLE_DNS_TIME_SERVICES_BASE_DIR=/opt/ansible-dns-time
 ```
@@ -31,4 +31,3 @@ cd Ansible
 
 - [DNS Server](../dns-server/README.md)
 - [Time Server](../time-server/README.md)
-

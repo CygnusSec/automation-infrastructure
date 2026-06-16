@@ -7,12 +7,12 @@ Example:
 ```yaml
 network_manage: true
 network_interface: ens18
-network_ipv4_address: 192.168.1.151
+network_ipv4_address: <target-ip>
 network_ipv4_prefix_length: 24
-network_ipv4_gateway: 192.168.1.1
+network_ipv4_gateway: <gateway-ip>
 network_dns_servers:
-  - 192.168.1.1
-  - 8.8.8.8
+  - <dns-ip-1>
+  - <dns-ip-2>
 ```
 
 Use with care because applying a new IP can interrupt the current Ansible session.
@@ -21,7 +21,7 @@ Use with care because applying a new IP can interrupt the current Ansible sessio
 
 ```bash
 cd Ansible
-./scripts/run-ansible.sh deploy --tags network --limit 172.16.3.21
+./scripts/run-ansible.sh deploy --tags network --limit <target-host-or-ip>
 ```
 
 When `/etc/netplan/50-cloud-init.yaml` exists, this role backs it up to
