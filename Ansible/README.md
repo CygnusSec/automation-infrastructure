@@ -533,7 +533,8 @@ zabbix-agent2-plugin-postgresql
 
 Override `ANSIBLE_ZABBIX_AGENT_RELEASE_URL` and
 `ANSIBLE_ZABBIX_AGENT_OFFLINE_PACKAGES` in `env.d/90-offline-bundle.env` if you
-need a different Ubuntu or Zabbix version.
+need a different Ubuntu or Zabbix version. The downloader image defaults to
+`ANSIBLE_ZABBIX_AGENT_DOWNLOAD_IMAGE=ubuntu:24.04`.
 
 This creates:
 

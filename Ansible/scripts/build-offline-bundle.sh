@@ -22,6 +22,7 @@ ANSIBLE_DNS_SERVER_IMAGE_TAR="${ANSIBLE_DNS_SERVER_IMAGE_TAR:-./repo/docker-imag
 ANSIBLE_TIME_SERVER_IMAGE="${ANSIBLE_TIME_SERVER_IMAGE:-local/chrony:offline}"
 ANSIBLE_TIME_SERVER_IMAGE_TAR="${ANSIBLE_TIME_SERVER_IMAGE_TAR:-./repo/docker-images/chrony.tar}"
 ANSIBLE_ZABBIX_AGENT_DOWNLOAD_PACKAGES="${ANSIBLE_ZABBIX_AGENT_DOWNLOAD_PACKAGES:-true}"
+ANSIBLE_ZABBIX_AGENT_DOWNLOAD_IMAGE="${ANSIBLE_ZABBIX_AGENT_DOWNLOAD_IMAGE:-ubuntu:24.04}"
 ANSIBLE_ZABBIX_AGENT_REPO_SOURCE="${ANSIBLE_ZABBIX_AGENT_REPO_SOURCE:-./repo/zabbix}"
 ANSIBLE_ZABBIX_AGENT_RELEASE_URL="${ANSIBLE_ZABBIX_AGENT_RELEASE_URL:-https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb}"
 ANSIBLE_ZABBIX_AGENT_OFFLINE_PACKAGES="${ANSIBLE_ZABBIX_AGENT_OFFLINE_PACKAGES:-zabbix-agent2 zabbix-agent2-plugin-mongodb zabbix-agent2-plugin-mssql zabbix-agent2-plugin-postgresql}"
@@ -76,20 +77,27 @@ download_zabbix_agent_packages() {
 
   echo "Downloading Zabbix Agent 2 offline packages into: ${repo_dir}"
   docker run --rm \
+    --tmpfs /tmp:exec,mode=1777 \
+    --tmpfs /var/lib/apt/lists:exec,mode=755 \
+    --tmpfs /var/cache/apt:exec,mode=755 \
     -e "ZABBIX_RELEASE_URL=${ANSIBLE_ZABBIX_AGENT_RELEASE_URL}" \
     -e "ZABBIX_PACKAGES=${ANSIBLE_ZABBIX_AGENT_OFFLINE_PACKAGES}" \
     -v "${repo_dir}:/zabbix-debs" \
-    ubuntu:24.04 \
+    "${ANSIBLE_ZABBIX_AGENT_DOWNLOAD_IMAGE}" \
     bash -lc '
       set -euo pipefail
       export DEBIAN_FRONTEND=noninteractive
-      apt-get update
+      chmod 1777 /tmp
+      rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+      apt-get -o Acquire::Retries=5 update
       apt-get install -y --no-install-recommends ca-certificates wget
       wget -O /tmp/zabbix-release.deb "${ZABBIX_RELEASE_URL}"
       dpkg -i /tmp/zabbix-release.deb
-      apt-get update
+      rm -rf /var/lib/apt/lists/*
+      apt-get -o Acquire::Retries=5 update
       mkdir -p /zabbix-debs/partial
       apt-get install -y --download-only --no-install-recommends \
+        -o Acquire::Retries=5 \
         -o Dir::Cache::archives=/zabbix-debs \
         ${ZABBIX_PACKAGES}
       find /zabbix-debs -maxdepth 1 -type f -name "*.deb" -print | sort
