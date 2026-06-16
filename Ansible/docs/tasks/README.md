@@ -23,6 +23,7 @@ alphabetic order.
 | [Network](network/README.md) | Apply static Netplan settings. | `./scripts/run-ansible.sh deploy --tags network` |
 | [Zabbix Agent 2 Install](zabbix-agent/README.md) | Install and configure Zabbix Agent 2 and plugins. | `./scripts/run-ansible.sh deploy --tags zabbix` |
 | [Zabbix Agent Uninstall](zabbix-agent-uninstall/README.md) | Remove Agent 2, plugins, and legacy Agent 1. | `./scripts/run-ansible.sh deploy --tags zabbix_agent_uninstall` |
+| [MariaDB Native Package Remove](mariadb-remove/README.md) | Remove native `mariadb-server` apt package from targets. | `./scripts/run-ansible.sh deploy --tags mariadb_remove` |
 | [DNS And Time Services](dns-time-services/README.md) | Deploy DNS and time server containers together. | `./scripts/run-ansible.sh deploy --tags dns_time_services` |
 | [DNS Server](dns-server/README.md) | Deploy only the BIND DNS container. | `./scripts/run-ansible.sh deploy --tags dns_server` |
 | [Time Server](time-server/README.md) | Deploy only the Chrony time server container. | `./scripts/run-ansible.sh deploy --tags time_server` |

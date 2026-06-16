@@ -47,7 +47,7 @@ env.d/90-offline-bundle.env  # online build/offline bundle settings
 
 | Tags | Env file |
 | --- | --- |
-| `base`, `prerequisite`, `docker` | `20-base.env` |
+| `base`, `prerequisite`, `docker`, `mariadb_remove` | `20-base.env` |
 | `hostname`, `network` | `25-host-network.env` |
 | `zabbix`, `zabbix_agent`, `zabbix_agent_uninstall` | `30-zabbix-agent.env` |
 | `dns_time_services`, `dns_server`, `time_server`, `ntp_client` | `40-dns-time.env` |

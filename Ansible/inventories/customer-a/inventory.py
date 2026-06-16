@@ -85,6 +85,14 @@ def build_inventory():
     tldh_database_master_hosts = csv_env("ANSIBLE_TLDH_DATABASE_MASTER_HOST")
     tldh_database_slave_hosts = csv_env("ANSIBLE_TLDH_DATABASE_SLAVE_HOSTS")
 
+    # Early warning: detect missing inventory environment variables.
+    if not manager_hosts and not all_target_hosts and not backend_hosts:
+        warn(
+            "all inventory host variables are empty. "
+            "Ensure ANSIBLE_SWARM_MANAGER_HOSTS or ANSIBLE_ALL_TARGET_HOSTS is set. "
+            "Check that env.d/10-inventory.env is loaded correctly."
+        )
+
     if cache_ext_tags and len(cache_ext_tags) != len(cache_ext_hosts):
         warn("ANSIBLE_SWARM_CACHE_SERVER_EXT_TAGS count does not match ANSIBLE_SWARM_CACHE_SERVER_EXT_HOSTS")
 

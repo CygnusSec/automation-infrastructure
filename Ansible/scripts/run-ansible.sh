@@ -97,7 +97,7 @@ DOCKER_ENV_ARGS=(
 while IFS='=' read -r env_name _; do
   case "${env_name}" in
     ANSIBLE_*)
-      DOCKER_ENV_ARGS+=("-e" "${env_name}")
+      DOCKER_ENV_ARGS+=("-e" "${env_name}=${!env_name}")
       ;;
   esac
 done < <(env | sort)
@@ -132,6 +132,20 @@ if ! docker image inspect "${ANSIBLE_IMAGE}" >/dev/null 2>&1; then
     ANSIBLE_IMAGE="${ANSIBLE_IMAGE}" LOCAL_RUNTIME_IMAGE="${LOCAL_RUNTIME_IMAGE}" \
       docker compose -f "${ROOT_DIR}/docker-compose.yaml" build ansible
   fi
+fi
+
+# Pre-flight check: verify critical inventory variables are loaded.
+if [[ -z "${ANSIBLE_SWARM_MANAGER_HOSTS:-}" && -z "${ANSIBLE_ALL_TARGET_HOSTS:-}" ]]; then
+  echo "" >&2
+  echo "ERROR: Inventory host variables are empty." >&2
+  echo "Neither ANSIBLE_SWARM_MANAGER_HOSTS nor ANSIBLE_ALL_TARGET_HOSTS is set." >&2
+  echo "Ansible will not find any hosts to target." >&2
+  echo "" >&2
+  echo "Troubleshooting:" >&2
+  echo "  1. Verify env.d/10-inventory.env exists and contains host definitions" >&2
+  echo "  2. Run: source scripts/lib/env.sh && load_ansible_env \"\$(pwd)\" && echo \"\${ANSIBLE_SWARM_MANAGER_HOSTS}\"" >&2
+  echo "" >&2
+  exit 1
 fi
 
 ANSIBLE_IMAGE="${ANSIBLE_IMAGE}" LOCAL_RUNTIME_IMAGE="${LOCAL_RUNTIME_IMAGE}" \

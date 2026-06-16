@@ -77,6 +77,21 @@
   tags:
     - zabbix_agent_uninstall
 
+- name: Remove native MariaDB server package
+  hosts: "{{ lookup('env', 'ANSIBLE_MARIADB_REMOVE_TARGET_GROUP') | default('all_targets', true) }}"
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Remove mariadb-server package
+      ansible.builtin.apt:
+        name: mariadb-server
+        state: absent
+        autoremove: true
+      tags:
+        - mariadb_remove
+  tags:
+    - mariadb_remove
+
 - name: Configure Dockerized DNS and time servers
   hosts: "{{ lookup('env', 'ANSIBLE_DNS_TIME_SERVICES_TARGET_GROUP') | default('dns_time_servers', true) }}"
   gather_facts: false

@@ -63,6 +63,7 @@ Common task runbooks:
 - [Network](docs/tasks/network/README.md)
 - [Zabbix Agent 2 Install](docs/tasks/zabbix-agent/README.md)
 - [Zabbix Agent Uninstall](docs/tasks/zabbix-agent-uninstall/README.md)
+- [MariaDB Native Package Remove](docs/tasks/mariadb-remove/README.md)
 - [DNS And Time Services](docs/tasks/dns-time-services/README.md)
 - [DNS Server](docs/tasks/dns-server/README.md)
 - [Time Server](docs/tasks/time-server/README.md)
@@ -203,6 +204,7 @@ Tag-to-env mapping:
 | Tags | Env file |
 | --- | --- |
 | `base`, `prerequisite`, `docker` | `env.d/20-base.env` |
+| `mariadb_remove` | `env.d/20-base.env` |
 | `hostname`, `network` | `env.d/25-host-network.env` |
 | `zabbix`, `zabbix_agent`, `zabbix_agent_uninstall` | `env.d/30-zabbix-agent.env` |
 | `dns_time_services`, `dns_server`, `time_server`, `ntp_client` | `env.d/40-dns-time.env` |
