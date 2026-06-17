@@ -280,21 +280,23 @@ ANSIBLE_SSH_PRIVATE_KEY_FILE=./inventories/customer-a/secrets/id_rsa
 ANSIBLE_SSH_COPY_ID_PUBLIC_KEY_FILE=./inventories/customer-a/secrets/id_rsa.pub
 ```
 
-For the first password-based SSH bootstrap, set:
+For the first password-based SSH bootstrap only, set:
 
 ```env
-ANSIBLE_SSH_PASSWORD_AUTH=true
-ANSIBLE_SSH_COMMON_ARGS="-o PubkeyAuthentication=no -o PreferredAuthentications=password"
 ANSIBLE_PASSWORD=your-ssh-password
 ANSIBLE_BECOME_PASSWORD=your-sudo-password
 ```
 
-After SSH keys are installed successfully, change these back:
+Use that password only with the `ssh-copy-id` bootstrap playbook. Normal
+deployments must connect with `ANSIBLE_SSH_USER` and
+`ANSIBLE_SSH_PRIVATE_KEY_FILE`; privileged tasks use sudo/become. After SSH keys
+are installed successfully, clear the bootstrap password:
 
 ```env
-ANSIBLE_SSH_PASSWORD_AUTH=false
+ANSIBLE_SSH_PASSWORD_AUTH=
+ANSIBLE_SSH_PASSWORD_AUTH_OVERRIDE=
+ANSIBLE_SSH_COMMON_ARGS=
 ANSIBLE_PASSWORD=
-ANSIBLE_BECOME_PASSWORD=
 ```
 
 Create task env files from the templates you need:
@@ -438,7 +440,8 @@ the password from `auth.yaml` instead of the private key. After this succeeds,
 the wrapper updates `.env` back to key mode:
 
 ```env
-ANSIBLE_SSH_PASSWORD_AUTH=false
+ANSIBLE_SSH_PASSWORD_AUTH=
+ANSIBLE_SSH_PASSWORD_AUTH_OVERRIDE=
 ANSIBLE_SSH_COMMON_ARGS=
 ANSIBLE_PASSWORD=
 ```

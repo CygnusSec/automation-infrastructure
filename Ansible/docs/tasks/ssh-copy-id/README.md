@@ -42,7 +42,8 @@ Run against one target while testing:
 Switch back to key-based SSH:
 
 ```env
-ANSIBLE_SSH_PASSWORD_AUTH=false
+ANSIBLE_SSH_PASSWORD_AUTH=
+ANSIBLE_SSH_PASSWORD_AUTH_OVERRIDE=
 ANSIBLE_SSH_COMMON_ARGS=
 ANSIBLE_PASSWORD=
 ```

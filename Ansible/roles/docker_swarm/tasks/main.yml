@@ -34,6 +34,45 @@
   tags:
     - docker_swarm
 
+- name: Validate Docker Swarm SSH user is not root
+  ansible.builtin.assert:
+    that:
+      - ansible_user | default('') != 'root'
+    fail_msg: >-
+      Do not run docker_swarm by SSHing as root. Set ANSIBLE_SSH_USER to a
+      sudo-capable user, for example bcy_admin; Docker commands will use
+      become/sudo after login.
+  tags:
+    - docker_swarm
+
+- name: Verify Docker Swarm commands can use sudo
+  ansible.builtin.command: id -u
+  register: docker_swarm_become_uid
+  changed_when: false
+  become: true
+  tags:
+    - docker_swarm
+
+- name: Fail when Docker Swarm commands cannot elevate through sudo
+  ansible.builtin.fail:
+    msg: >-
+      Docker Swarm connected as sudo user {{ ansible_user }}, but commands did
+      not elevate through sudo on {{ inventory_hostname }}. Check
+      ANSIBLE_BECOME, ANSIBLE_BECOME_PASSWORD, and sudo permissions.
+  when: docker_swarm_become_uid.stdout | default('') != '0'
+  tags:
+    - docker_swarm
+
+- name: Ensure Docker service is running before Swarm operations
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: true
+    daemon_reload: true
+  become: true
+  tags:
+    - docker_swarm
+
 - name: Check Docker Swarm state
   ansible.builtin.command: docker info --format '{{ "{{" }} .Swarm.LocalNodeState {{ "}}" }}'
   register: docker_swarm_state
@@ -48,7 +87,9 @@
     msg: >-
       Docker API is not accessible on {{ inventory_hostname }}. Ensure Docker is
       running and Ansible can become root before running docker_swarm. Error:
-      {{ docker_swarm_state.stderr | default(docker_swarm_state.msg | default('unknown error')) }}
+      rc={{ docker_swarm_state.rc | default('unknown') }},
+      stdout={{ docker_swarm_state.stdout | default('') }},
+      stderr={{ docker_swarm_state.stderr | default(docker_swarm_state.msg | default('unknown error')) }}
   when: docker_swarm_state.rc | default(1) != 0
   tags:
     - docker_swarm

@@ -1,5 +1,6 @@
 ---
 - name: Install Docker dependencies
+  become: true
   ansible.builtin.apt:
     name:
       - ca-certificates
@@ -13,6 +14,7 @@
     - docker
 
 - name: Create Docker local repo directory
+  become: true
   ansible.builtin.file:
     path: "{{ docker_repo_dest }}"
     state: directory
@@ -24,6 +26,7 @@
     - docker
 
 - name: Copy Docker local deb repository
+  become: true
   ansible.builtin.copy:
     src: "{{ docker_repo_source }}/"
     dest: "{{ docker_repo_dest }}/"
@@ -35,6 +38,7 @@
     - docker
 
 - name: Install Docker from local deb repository
+  become: true
   ansible.builtin.shell: apt-get install -y "{{ docker_repo_dest }}"/*.deb
   args:
     executable: /bin/bash
@@ -43,6 +47,7 @@
     - docker
 
 - name: Install Docker from apt repositories
+  become: true
   ansible.builtin.apt:
     name: "{{ docker_packages }}"
     state: present
@@ -52,6 +57,7 @@
     - docker
 
 - name: Ensure docker group exists
+  become: true
   ansible.builtin.group:
     name: docker
     state: present
@@ -59,6 +65,7 @@
     - docker
 
 - name: Add configured users to docker group
+  become: true
   ansible.builtin.user:
     name: "{{ item }}"
     groups: docker
@@ -68,6 +75,7 @@
     - docker
 
 - name: Enable and start Docker service
+  become: true
   ansible.builtin.systemd:
     name: docker
     state: started

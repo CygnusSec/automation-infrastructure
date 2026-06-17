@@ -51,7 +51,7 @@ else
   docker build -f "${ROOT_DIR}/build/dockerfile" -t "${PACKAGE_IMAGE}" "${ROOT_DIR}"
 fi
 
-if ! docker image inspect "${PACKAGE_IMAGE}" >/dev/null 2>&1; then
+if ! docker inspect --type image "${PACKAGE_IMAGE}" >/dev/null 2>&1; then
   echo "Runtime image is not available locally after pull/build: ${PACKAGE_IMAGE}" >&2
   exit 1
 fi
