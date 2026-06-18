@@ -6,7 +6,12 @@
       - zabbix_agent_hostname | length > 0
       - zabbix_agent_packages is sequence
       - "'zabbix-agent2' in zabbix_agent_packages"
-    fail_msg: "Set zabbix_agent_server_host and zabbix_agent_hostname, and keep zabbix-agent2 in zabbix_agent_packages."
+      - "'zabbix-agent' not in zabbix_agent_packages"
+      - zabbix_agent_service_name == "zabbix-agent2"
+    fail_msg: >-
+      Set zabbix_agent_server_host and zabbix_agent_hostname, keep
+      zabbix-agent2 in zabbix_agent_packages, do not install legacy
+      zabbix-agent, and keep zabbix_agent_service_name=zabbix-agent2.
   tags:
     - zabbix
     - zabbix_agent
@@ -136,12 +141,18 @@
   ansible.builtin.assert:
     that:
       - zabbix_agent_local_debs.matched | int > 0
+      - >-
+        zabbix_agent_local_debs.files
+        | map(attribute='path')
+        | select('search', '/zabbix-agent2_[^/]*\\.deb$')
+        | list
+        | length > 0
     fail_msg: >-
-      No .deb files found in {{ zabbix_agent_repo_dest }} on
+      No zabbix-agent2 .deb files found in {{ zabbix_agent_repo_dest }} on
       {{ inventory_hostname }}. The control source {{ zabbix_agent_repo_source }}
       is {{ 'available' if zabbix_agent_repo_source_stat.stat.exists else 'missing' }}.
-      Add Zabbix agent packages to the control repo or preload them on this host
-      before running offline.
+      Add zabbix-agent2 and its dependency .deb files to the control repo or
+      preload them on this host before running offline.
   when: zabbix_agent_install_from_local_repo | bool
   tags:
     - zabbix

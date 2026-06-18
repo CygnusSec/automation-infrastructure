@@ -804,15 +804,14 @@ Run only Zabbix Agent configuration:
 ./scripts/run-ansible.sh deploy --tags zabbix
 ```
 
-Uninstall Zabbix Agent and plugins from the target group:
+Uninstall Zabbix Agent 2 and legacy Agent 1 from the target group:
 
 ```bash
 ./scripts/run-ansible.sh deploy --tags zabbix_agent_uninstall
 ```
 
 By default uninstall stops both `zabbix-agent2` and legacy `zabbix-agent`, then
-removes `zabbix-agent2`, the MongoDB/MSSQL/PostgreSQL agent2 plugins, and the
-legacy `zabbix-agent` package if it exists. Set
+removes `zabbix-agent2` and the legacy `zabbix-agent` package if it exists. Set
 `ANSIBLE_ZABBIX_AGENT_UNINSTALL_REMOVE_LOCAL_REPO=true` if the copied offline
 package directory under `ANSIBLE_ZABBIX_AGENT_REPO_DEST` should also be removed.
 
