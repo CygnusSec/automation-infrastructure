@@ -40,7 +40,8 @@ set_env_value() {
   fi
 }
 
-set_env_value "ANSIBLE_SSH_PASSWORD_AUTH" "false"
+set_env_value "ANSIBLE_SSH_PASSWORD_AUTH" ""
+set_env_value "ANSIBLE_SSH_PASSWORD_AUTH_OVERRIDE" ""
 set_env_value "ANSIBLE_SSH_COMMON_ARGS" ""
 set_env_value "ANSIBLE_PASSWORD" ""
 

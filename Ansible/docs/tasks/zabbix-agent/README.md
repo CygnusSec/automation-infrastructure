@@ -23,7 +23,6 @@ want the server to also run an agent.
 
 - stops and removes legacy `zabbix-agent`
 - installs `zabbix-agent2`
-- installs the MongoDB, MSSQL, and PostgreSQL Agent 2 plugins
 - writes `Server=`, `ServerActive=`, and `Hostname=`
 - enables and starts `zabbix-agent2`
 
@@ -43,7 +42,7 @@ ANSIBLE_ZABBIX_AGENT_HOSTNAME=
 ANSIBLE_ZABBIX_AGENT_INSTALL_FROM_LOCAL_REPO=true
 ANSIBLE_ZABBIX_AGENT_REPO_SOURCE=./repo/zabbix
 ANSIBLE_ZABBIX_AGENT_REPO_DEST=/media/installation/zabbix
-ANSIBLE_ZABBIX_AGENT_PACKAGES="[zabbix-agent2, zabbix-agent2-plugin-mongodb, zabbix-agent2-plugin-mssql, zabbix-agent2-plugin-postgresql]"
+ANSIBLE_ZABBIX_AGENT_PACKAGES="[zabbix-agent2]"
 ANSIBLE_ZABBIX_AGENT_SERVICE_NAME=zabbix-agent2
 ANSIBLE_ZABBIX_AGENT_CONFIG_FILE=/etc/zabbix/zabbix_agent2.conf
 ANSIBLE_ZABBIX_AGENT_REMOVE_LEGACY_AGENT=true

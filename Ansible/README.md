@@ -280,21 +280,23 @@ ANSIBLE_SSH_PRIVATE_KEY_FILE=./inventories/customer-a/secrets/id_rsa
 ANSIBLE_SSH_COPY_ID_PUBLIC_KEY_FILE=./inventories/customer-a/secrets/id_rsa.pub
 ```
 
-For the first password-based SSH bootstrap, set:
+For the first password-based SSH bootstrap only, set:
 
 ```env
-ANSIBLE_SSH_PASSWORD_AUTH=true
-ANSIBLE_SSH_COMMON_ARGS="-o PubkeyAuthentication=no -o PreferredAuthentications=password"
 ANSIBLE_PASSWORD=your-ssh-password
 ANSIBLE_BECOME_PASSWORD=your-sudo-password
 ```
 
-After SSH keys are installed successfully, change these back:
+Use that password only with the `ssh-copy-id` bootstrap playbook. Normal
+deployments must connect with `ANSIBLE_SSH_USER` and
+`ANSIBLE_SSH_PRIVATE_KEY_FILE`; privileged tasks use sudo/become. After SSH keys
+are installed successfully, clear the bootstrap password:
 
 ```env
-ANSIBLE_SSH_PASSWORD_AUTH=false
+ANSIBLE_SSH_PASSWORD_AUTH=
+ANSIBLE_SSH_PASSWORD_AUTH_OVERRIDE=
+ANSIBLE_SSH_COMMON_ARGS=
 ANSIBLE_PASSWORD=
-ANSIBLE_BECOME_PASSWORD=
 ```
 
 Create task env files from the templates you need:
@@ -438,7 +440,8 @@ the password from `auth.yaml` instead of the private key. After this succeeds,
 the wrapper updates `.env` back to key mode:
 
 ```env
-ANSIBLE_SSH_PASSWORD_AUTH=false
+ANSIBLE_SSH_PASSWORD_AUTH=
+ANSIBLE_SSH_PASSWORD_AUTH_OVERRIDE=
 ANSIBLE_SSH_COMMON_ARGS=
 ANSIBLE_PASSWORD=
 ```
@@ -528,9 +531,6 @@ The default downloaded packages are:
 
 ```text
 zabbix-agent2
-zabbix-agent2-plugin-mongodb
-zabbix-agent2-plugin-mssql
-zabbix-agent2-plugin-postgresql
 ```
 
 Override `ANSIBLE_ZABBIX_AGENT_RELEASE_URL` and
@@ -764,7 +764,7 @@ and fill the real server address only in your local env file:
 # ANSIBLE_ZABBIX_AGENT_HOSTNAME=
 # ANSIBLE_ZABBIX_AGENT_MANAGE_APT_REPO=true
 # ANSIBLE_ZABBIX_AGENT_RELEASE_URL=https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb
-# ANSIBLE_ZABBIX_AGENT_PACKAGES=[zabbix-agent2, zabbix-agent2-plugin-mongodb, zabbix-agent2-plugin-mssql, zabbix-agent2-plugin-postgresql]
+# ANSIBLE_ZABBIX_AGENT_PACKAGES=[zabbix-agent2]
 # ANSIBLE_ZABBIX_AGENT_SERVICE_NAME=zabbix-agent2
 # ANSIBLE_ZABBIX_AGENT_CONFIG_FILE=/etc/zabbix/zabbix_agent2.conf
 # ANSIBLE_ZABBIX_AGENT_REMOVE_LEGACY_AGENT=true
@@ -804,15 +804,16 @@ Run only Zabbix Agent configuration:
 ./scripts/run-ansible.sh deploy --tags zabbix
 ```
 
-Uninstall Zabbix Agent and plugins from the target group:
+Uninstall Zabbix Agent 2, legacy Agent 1, and any Zabbix server packages from
+the agent target group:
 
 ```bash
 ./scripts/run-ansible.sh deploy --tags zabbix_agent_uninstall
 ```
 
-By default uninstall stops both `zabbix-agent2` and legacy `zabbix-agent`, then
-removes `zabbix-agent2`, the MongoDB/MSSQL/PostgreSQL agent2 plugins, and the
-legacy `zabbix-agent` package if it exists. Set
+By default uninstall stops `zabbix-agent2`, legacy `zabbix-agent`, and
+`zabbix-server`, then removes `zabbix-agent2`, legacy `zabbix-agent`,
+`zabbix-server`, `zabbix-server-mysql`, and `zabbix-server-pgsql` if they exist. Set
 `ANSIBLE_ZABBIX_AGENT_UNINSTALL_REMOVE_LOCAL_REPO=true` if the copied offline
 package directory under `ANSIBLE_ZABBIX_AGENT_REPO_DEST` should also be removed.
 

@@ -31,6 +31,9 @@ cd Ansible
 ./scripts/run-ansible.sh deploy --tags docker_swarm
 ```
 
+Do not SSH as `root`. Set `ANSIBLE_SSH_USER` to a sudo-capable user such as
+`bcy_admin`; the role uses Ansible `become`/sudo for Docker commands.
+
 ## Reset And Rejoin
 
 Use reset only when you intentionally want nodes to leave their current Swarm:

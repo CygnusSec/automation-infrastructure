@@ -30,8 +30,10 @@ This playbook uses the inventory connection variables from `.env`, including:
 
 - `ANSIBLE_SSH_USER`
 - `ANSIBLE_SSH_PRIVATE_KEY_FILE`
-- `ANSIBLE_SSH_PASSWORD_AUTH`
 - `ANSIBLE_BECOME`
+
+Normal runs require key-based SSH with a non-root sudo-capable user. Password
+SSH is reserved for the `ssh-copy-id` bootstrap playbook only.
 
 ## Expected Result
 

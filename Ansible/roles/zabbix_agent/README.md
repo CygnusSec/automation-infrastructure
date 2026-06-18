@@ -24,7 +24,7 @@ same hostname value for every targeted agent.
 Default packages:
 
 ```env
-ANSIBLE_ZABBIX_AGENT_PACKAGES=[zabbix-agent2, zabbix-agent2-plugin-mongodb, zabbix-agent2-plugin-mssql, zabbix-agent2-plugin-postgresql]
+ANSIBLE_ZABBIX_AGENT_PACKAGES=[zabbix-agent2]
 ANSIBLE_ZABBIX_AGENT_SERVICE_NAME=zabbix-agent2
 ANSIBLE_ZABBIX_AGENT_CONFIG_FILE=/etc/zabbix/zabbix_agent2.conf
 ```
@@ -60,7 +60,7 @@ Run only this role:
 ./scripts/run-ansible.sh deploy --tags zabbix
 ```
 
-Uninstall Agent 2 and legacy Agent 1 packages:
+Uninstall Agent 2, legacy Agent 1, and any Zabbix server packages from agent targets:
 
 ```bash
 ./scripts/run-ansible.sh deploy --tags zabbix_agent_uninstall

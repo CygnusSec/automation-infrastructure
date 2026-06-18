@@ -11,6 +11,9 @@ cd Ansible
 ./scripts/run-ansible.sh deploy --tags docker_swarm
 ```
 
+Use the configured sudo-capable SSH user, not `root`. The wrapper connects as
+`ANSIBLE_SSH_USER`; this role uses Ansible `become`/sudo for Docker commands.
+
 Configure iptables separately:
 
 ```bash

@@ -139,7 +139,16 @@ def build_inventory():
     ]
     add_children(inventory, "swarm_workers", swarm_worker_groups)
     add_children(inventory, "linux", ["swarm_managers", "swarm_workers"])
-    add_children(inventory, "ssh_copy_id_targets", ["swarm_managers", "swarm_workers", "ssh_copy_id_extra_targets"])
+    add_children(
+        inventory,
+        "ssh_copy_id_targets",
+        [
+            "swarm_managers",
+            "swarm_workers",
+            "external_disk_targets",
+            "ssh_copy_id_extra_targets",
+        ],
+    )
 
     ip_to_alias = {
         hostvars["ansible_host"]: alias
