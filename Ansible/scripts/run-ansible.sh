@@ -116,6 +116,68 @@ if [[ -z "${PLAYBOOK_PATH}" ]]; then
   exit 1
 fi
 
+inventory_alias_for_ip() {
+  local ip="$1"
+  python3 - "${ROOT_DIR}" "${ip}" <<'PY'
+import importlib.util
+import sys
+
+root_dir = sys.argv[1]
+target_ip = sys.argv[2]
+inventory_path = f"{root_dir}/inventories/customer-a/inventory.py"
+
+spec = importlib.util.spec_from_file_location("customer_inventory", inventory_path)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+
+for alias, hostvars in module.build_inventory().get("_meta", {}).get("hostvars", {}).items():
+    if hostvars.get("ansible_host") == target_ip:
+        print(alias)
+        break
+PY
+}
+
+translate_limit_value() {
+  local value="$1"
+  local alias
+
+  if [[ "${value}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    alias="$(inventory_alias_for_ip "${value}")"
+    if [[ -n "${alias}" ]]; then
+      printf '%s\n' "${alias}"
+      return 0
+    fi
+  fi
+
+  printf '%s\n' "${value}"
+}
+
+PLAYBOOK_ARGS=()
+_translate_next_limit="false"
+for arg in "${@:2}"; do
+  if [[ "${_translate_next_limit}" == "true" ]]; then
+    PLAYBOOK_ARGS+=("$(translate_limit_value "${arg}")")
+    _translate_next_limit="false"
+    continue
+  fi
+
+  case "${arg}" in
+    --limit|-l)
+      PLAYBOOK_ARGS+=("${arg}")
+      _translate_next_limit="true"
+      ;;
+    --limit=*)
+      PLAYBOOK_ARGS+=("--limit=$(translate_limit_value "${arg#--limit=}")")
+      ;;
+    -l=*)
+      PLAYBOOK_ARGS+=("-l=$(translate_limit_value "${arg#-l=}")")
+      ;;
+    *)
+      PLAYBOOK_ARGS+=("${arg}")
+      ;;
+  esac
+done
+
 PRIVATE_KEY_PATH="$(resolve_project_path "${ANSIBLE_SSH_PRIVATE_KEY_FILE:-./inventories/customer-a/secrets/id_rsa}")"
 IS_SSH_COPY_ID_PLAYBOOK=false
 if [[ "${PLAYBOOK_PATH}" == "playbooks/ssh-copy-id."* ]]; then
@@ -247,4 +309,4 @@ if [[ "${_preflight_has_hosts}" == "false" ]]; then
 fi
 
 ANSIBLE_IMAGE="${ANSIBLE_IMAGE}" LOCAL_RUNTIME_IMAGE="${LOCAL_RUNTIME_IMAGE}" \
-  docker compose -f "${ROOT_DIR}/docker-compose.yaml" run --rm "${DOCKER_ENV_ARGS[@]}" ansible ansible-playbook "${PLAYBOOK_PATH}" "${EXTRA_ARGS[@]}" "${@:2}"
+  docker compose -f "${ROOT_DIR}/docker-compose.yaml" run --rm "${DOCKER_ENV_ARGS[@]}" ansible ansible-playbook "${PLAYBOOK_PATH}" "${EXTRA_ARGS[@]}" "${PLAYBOOK_ARGS[@]}"

@@ -105,20 +105,6 @@
     - zabbix
     - zabbix_agent
 
-- name: Fail when Zabbix local deb repository source is missing
-  ansible.builtin.fail:
-    msg: >-
-      Zabbix local repository source not found on control:
-      {{ zabbix_agent_repo_source }}. Build/copy offline packages there, or set
-      ANSIBLE_ZABBIX_AGENT_INSTALL_FROM_LOCAL_REPO=false for online install.
-  when:
-    - zabbix_agent_install_from_local_repo | bool
-    - not zabbix_agent_repo_source_stat.stat.exists
-  run_once: true
-  tags:
-    - zabbix
-    - zabbix_agent
-
 - name: Copy Zabbix local deb repository
   become: true
   ansible.builtin.copy:
@@ -127,7 +113,9 @@
     owner: root
     group: root
     mode: preserve
-  when: zabbix_agent_install_from_local_repo | bool
+  when:
+    - zabbix_agent_install_from_local_repo | bool
+    - zabbix_agent_repo_source_stat.stat.exists
   tags:
     - zabbix
     - zabbix_agent
@@ -148,7 +136,12 @@
   ansible.builtin.assert:
     that:
       - zabbix_agent_local_debs.matched | int > 0
-    fail_msg: "No .deb files found in {{ zabbix_agent_repo_dest }}. Add Zabbix agent packages under {{ zabbix_agent_repo_source }} before running offline."
+    fail_msg: >-
+      No .deb files found in {{ zabbix_agent_repo_dest }} on
+      {{ inventory_hostname }}. The control source {{ zabbix_agent_repo_source }}
+      is {{ 'available' if zabbix_agent_repo_source_stat.stat.exists else 'missing' }}.
+      Add Zabbix agent packages to the control repo or preload them on this host
+      before running offline.
   when: zabbix_agent_install_from_local_repo | bool
   tags:
     - zabbix

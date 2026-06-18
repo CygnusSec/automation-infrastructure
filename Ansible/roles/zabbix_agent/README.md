@@ -24,7 +24,7 @@ same hostname value for every targeted agent.
 Default packages:
 
 ```env
-ANSIBLE_ZABBIX_AGENT_PACKAGES=[zabbix-agent2, zabbix-agent2-plugin-mongodb, zabbix-agent2-plugin-mssql, zabbix-agent2-plugin-postgresql]
+ANSIBLE_ZABBIX_AGENT_PACKAGES=[zabbix-agent2]
 ANSIBLE_ZABBIX_AGENT_SERVICE_NAME=zabbix-agent2
 ANSIBLE_ZABBIX_AGENT_CONFIG_FILE=/etc/zabbix/zabbix_agent2.conf
 ```

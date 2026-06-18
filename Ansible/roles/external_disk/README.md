@@ -15,8 +15,11 @@ cd Ansible
 Test one host first:
 
 ```bash
-./scripts/run-ansible.sh deploy --tags external_disk --limit <target-host-or-ip>
+./scripts/run-ansible.sh deploy --tags external_disk --limit 172.16.5.58
 ```
+
+The wrapper translates IP limits to the matching dynamic inventory alias. You
+can also use the alias from `./scripts/run-ansible.sh deploy --tags external_disk --list-hosts`.
 
 ## Key Variables
 

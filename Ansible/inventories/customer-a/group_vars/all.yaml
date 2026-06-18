@@ -67,7 +67,7 @@ zabbix_agent_repo_dest: "{{ lookup('env', 'ANSIBLE_ZABBIX_AGENT_REPO_DEST') | de
 zabbix_agent_manage_apt_repo: "{{ (lookup('env', 'ANSIBLE_ZABBIX_AGENT_MANAGE_APT_REPO') | default('true', true)) | bool }}"
 zabbix_agent_release_url: "{{ lookup('env', 'ANSIBLE_ZABBIX_AGENT_RELEASE_URL') | default('https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb', true) }}"
 zabbix_agent_release_package_path: "{{ lookup('env', 'ANSIBLE_ZABBIX_AGENT_RELEASE_PACKAGE_PATH') | default('/tmp/zabbix-release_latest_7.0+ubuntu24.04_all.deb', true) }}"
-zabbix_agent_packages: "{{ lookup('env', 'ANSIBLE_ZABBIX_AGENT_PACKAGES') | default('[zabbix-agent2, zabbix-agent2-plugin-mongodb, zabbix-agent2-plugin-mssql, zabbix-agent2-plugin-postgresql]', true) | from_yaml }}"
+zabbix_agent_packages: "{{ lookup('env', 'ANSIBLE_ZABBIX_AGENT_PACKAGES') | default('[zabbix-agent2]', true) | from_yaml }}"
 zabbix_agent_service_name: "{{ lookup('env', 'ANSIBLE_ZABBIX_AGENT_SERVICE_NAME') | default('zabbix-agent2', true) }}"
 zabbix_agent_config_file: "{{ lookup('env', 'ANSIBLE_ZABBIX_AGENT_CONFIG_FILE') | default('/etc/zabbix/zabbix_agent2.conf', true) }}"
 zabbix_agent_server_host: "{{ lookup('env', 'ANSIBLE_ZABBIX_SERVER_HOST') | default('', true) }}"

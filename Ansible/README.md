@@ -531,9 +531,6 @@ The default downloaded packages are:
 
 ```text
 zabbix-agent2
-zabbix-agent2-plugin-mongodb
-zabbix-agent2-plugin-mssql
-zabbix-agent2-plugin-postgresql
 ```
 
 Override `ANSIBLE_ZABBIX_AGENT_RELEASE_URL` and
@@ -767,7 +764,7 @@ and fill the real server address only in your local env file:
 # ANSIBLE_ZABBIX_AGENT_HOSTNAME=
 # ANSIBLE_ZABBIX_AGENT_MANAGE_APT_REPO=true
 # ANSIBLE_ZABBIX_AGENT_RELEASE_URL=https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb
-# ANSIBLE_ZABBIX_AGENT_PACKAGES=[zabbix-agent2, zabbix-agent2-plugin-mongodb, zabbix-agent2-plugin-mssql, zabbix-agent2-plugin-postgresql]
+# ANSIBLE_ZABBIX_AGENT_PACKAGES=[zabbix-agent2]
 # ANSIBLE_ZABBIX_AGENT_SERVICE_NAME=zabbix-agent2
 # ANSIBLE_ZABBIX_AGENT_CONFIG_FILE=/etc/zabbix/zabbix_agent2.conf
 # ANSIBLE_ZABBIX_AGENT_REMOVE_LEGACY_AGENT=true

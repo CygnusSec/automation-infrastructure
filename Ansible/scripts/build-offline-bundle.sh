@@ -25,7 +25,7 @@ ANSIBLE_ZABBIX_AGENT_DOWNLOAD_PACKAGES="${ANSIBLE_ZABBIX_AGENT_DOWNLOAD_PACKAGES
 ANSIBLE_ZABBIX_AGENT_DOWNLOAD_IMAGE="${ANSIBLE_ZABBIX_AGENT_DOWNLOAD_IMAGE:-ubuntu:24.04}"
 ANSIBLE_ZABBIX_AGENT_REPO_SOURCE="${ANSIBLE_ZABBIX_AGENT_REPO_SOURCE:-./repo/zabbix}"
 ANSIBLE_ZABBIX_AGENT_RELEASE_URL="${ANSIBLE_ZABBIX_AGENT_RELEASE_URL:-https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb}"
-ANSIBLE_ZABBIX_AGENT_OFFLINE_PACKAGES="${ANSIBLE_ZABBIX_AGENT_OFFLINE_PACKAGES:-zabbix-agent2 zabbix-agent2-plugin-mongodb zabbix-agent2-plugin-mssql zabbix-agent2-plugin-postgresql}"
+ANSIBLE_ZABBIX_AGENT_OFFLINE_PACKAGES="${ANSIBLE_ZABBIX_AGENT_OFFLINE_PACKAGES:-zabbix-agent2}"
 
 if [[ "${RUNTIME_IMAGE}" == *.tar || "${RUNTIME_IMAGE}" == *.tar.gz ]]; then
   echo "Ignoring RUNTIME_IMAGE tar path while building bundle: ${RUNTIME_IMAGE}"
