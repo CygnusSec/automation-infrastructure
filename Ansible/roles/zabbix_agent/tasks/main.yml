@@ -98,9 +98,22 @@
     - zabbix
     - zabbix_agent
 
+- name: Resolve Zabbix local deb repository source on control
+  ansible.builtin.set_fact:
+    zabbix_agent_repo_source_resolved: >-
+      {{
+        zabbix_agent_repo_source
+        if zabbix_agent_repo_source.startswith('/')
+        else playbook_dir ~ '/../' ~ zabbix_agent_repo_source
+      }}
+  when: zabbix_agent_install_from_local_repo | bool
+  tags:
+    - zabbix
+    - zabbix_agent
+
 - name: Check Zabbix local deb repository source
   ansible.builtin.stat:
-    path: "{{ zabbix_agent_repo_source }}"
+    path: "{{ zabbix_agent_repo_source_resolved }}"
   register: zabbix_agent_repo_source_stat
   delegate_to: localhost
   become: false
@@ -113,7 +126,7 @@
 - name: Copy Zabbix local deb repository
   become: true
   ansible.builtin.copy:
-    src: "{{ zabbix_agent_repo_source }}/"
+    src: "{{ zabbix_agent_repo_source_resolved }}/"
     dest: "{{ zabbix_agent_repo_dest }}/"
     owner: root
     group: root
@@ -149,7 +162,7 @@
         | length > 0
     fail_msg: >-
       No zabbix-agent2 .deb files found in {{ zabbix_agent_repo_dest }} on
-      {{ inventory_hostname }}. The control source {{ zabbix_agent_repo_source }}
+      {{ inventory_hostname }}. The control source {{ zabbix_agent_repo_source_resolved }}
       is {{ 'available' if zabbix_agent_repo_source_stat.stat.exists else 'missing' }}.
       Add zabbix-agent2 and its dependency .deb files to the control repo or
       preload them on this host before running offline.

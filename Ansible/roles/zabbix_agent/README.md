@@ -60,7 +60,7 @@ Run only this role:
 ./scripts/run-ansible.sh deploy --tags zabbix
 ```
 
-Uninstall Agent 2 and legacy Agent 1 packages:
+Uninstall Agent 2, legacy Agent 1, and any Zabbix server packages from agent targets:
 
 ```bash
 ./scripts/run-ansible.sh deploy --tags zabbix_agent_uninstall
