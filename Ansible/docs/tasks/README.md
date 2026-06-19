@@ -21,6 +21,7 @@ alphabetic order.
 | [Docker](docker/README.md) | Install Docker and Docker Compose v2. | `./scripts/run-ansible.sh deploy --tags docker` |
 | [Hostname](hostname/README.md) | Set Linux hostnames and `/etc/hosts`. | `./scripts/run-ansible.sh deploy --tags hostname` |
 | [Network](network/README.md) | Apply static Netplan settings. | `./scripts/run-ansible.sh deploy --tags network` |
+| [Zabbix Server Install](zabbix-server/README.md) | Install Zabbix Server packages for PostgreSQL. | `./scripts/run-ansible.sh deploy --tags zabbix_server` |
 | [Zabbix Agent 2 Install](zabbix-agent/README.md) | Install and configure Zabbix Agent 2. | `./scripts/run-ansible.sh deploy --tags zabbix` |
 | [Zabbix Agent Uninstall](zabbix-agent-uninstall/README.md) | Remove Agent 2, legacy Agent 1, and accidental Zabbix server packages from agent targets. | `./scripts/run-ansible.sh deploy --tags zabbix_agent_uninstall` |
 | [MariaDB Native Package Remove](mariadb-remove/README.md) | Remove native `mariadb-server` apt package from targets. | `./scripts/run-ansible.sh deploy --tags mariadb_remove` |

@@ -7,6 +7,7 @@ This task is run on an online machine to build an offline Ansible bundle.
 - builds or pulls the Ansible runtime image
 - builds DNS and time service images when enabled
 - downloads Zabbix Agent 2 `.deb` packages when enabled
+- downloads Zabbix Server `.deb` packages when enabled
 - saves the runtime image as `image-runtime/ansible-runtime.tar`
 - packages the Ansible project into `dist/ansible-base-offline-<timestamp>.tar.gz`
 - excludes local `.env`, `env.d/*.env`, SSH private/public keys, and local
@@ -22,9 +23,15 @@ ANSIBLE_ZABBIX_AGENT_DOWNLOAD_PACKAGES=true
 ANSIBLE_ZABBIX_AGENT_DOWNLOAD_IMAGE=ubuntu:24.04
 ANSIBLE_ZABBIX_AGENT_RELEASE_URL=https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb
 ANSIBLE_ZABBIX_AGENT_OFFLINE_PACKAGES="zabbix-agent2"
+ANSIBLE_ZABBIX_SERVER_DOWNLOAD_PACKAGES=true
+ANSIBLE_ZABBIX_SERVER_REPO_SOURCE=./repo/zabbix-server
+ANSIBLE_ZABBIX_SERVER_RELEASE_URL=https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb
+ANSIBLE_ZABBIX_SERVER_OFFLINE_PACKAGES="zabbix-server-pgsql zabbix-frontend-php php8.3-pgsql zabbix-nginx-conf zabbix-sql-scripts zabbix-agent"
 ```
 
 The Zabbix package downloader runs in `ANSIBLE_ZABBIX_AGENT_DOWNLOAD_IMAGE`.
+Agent packages are written to `repo/zabbix`, while server packages are written
+to `repo/zabbix-server` by default.
 If apt reports invalid repository signatures, first check Docker disk space and
 the host clock on the online build machine.
 

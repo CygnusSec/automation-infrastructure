@@ -46,6 +46,17 @@
   tags:
     - network
 
+- name: Install Zabbix server
+  hosts: "{{ lookup('env', 'ANSIBLE_ZABBIX_SERVER_TARGET_GROUP') | default('zabbix_server_targets', true) }}"
+  gather_facts: false
+  become: true
+  roles:
+    - role: zabbix_server
+      when: zabbix_server_enabled | bool
+  tags:
+    - zabbix
+    - zabbix_server
+
 - name: Configure Zabbix agents
   hosts: "{{ lookup('env', 'ANSIBLE_ZABBIX_AGENT_TARGET_GROUP') | default('zabbix_agent_targets', true) }}"
   gather_facts: false

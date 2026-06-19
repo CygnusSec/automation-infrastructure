@@ -43,7 +43,7 @@ load_ansible_env() {
       hostname|network)
         printf '%s\n' "25-host-network.env"
         ;;
-      zabbix|zabbix_agent|zabbix_agent_uninstall)
+      zabbix|zabbix_server|zabbix_agent|zabbix_agent_uninstall)
         printf '%s\n' "30-zabbix-agent.env"
         ;;
       dns_time_services|dns_server|time_server|ntp_client)
