@@ -52,7 +52,7 @@ The controlling variables live in `env.d/90-offline-bundle.env`:
 ```env
 ANSIBLE_ZABBIX_SERVER_DOWNLOAD_PACKAGES=true
 ANSIBLE_ZABBIX_SERVER_REPO_SOURCE=./repo/zabbix-server
-ANSIBLE_ZABBIX_SERVER_OFFLINE_PACKAGES="zabbix-server-pgsql zabbix-frontend-php php8.3-pgsql zabbix-nginx-conf zabbix-sql-scripts zabbix-agent"
+ANSIBLE_ZABBIX_SERVER_OFFLINE_PACKAGES="zabbix-server-pgsql zabbix-frontend-php php8.3-pgsql zabbix-nginx-conf zabbix-sql-scripts zabbix-agent systemd-sysv"
 ```
 
 ## Command

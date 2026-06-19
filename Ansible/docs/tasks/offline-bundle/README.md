@@ -26,7 +26,7 @@ ANSIBLE_ZABBIX_AGENT_OFFLINE_PACKAGES="zabbix-agent2"
 ANSIBLE_ZABBIX_SERVER_DOWNLOAD_PACKAGES=true
 ANSIBLE_ZABBIX_SERVER_REPO_SOURCE=./repo/zabbix-server
 ANSIBLE_ZABBIX_SERVER_RELEASE_URL=https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb
-ANSIBLE_ZABBIX_SERVER_OFFLINE_PACKAGES="zabbix-server-pgsql zabbix-frontend-php php8.3-pgsql zabbix-nginx-conf zabbix-sql-scripts zabbix-agent"
+ANSIBLE_ZABBIX_SERVER_OFFLINE_PACKAGES="zabbix-server-pgsql zabbix-frontend-php php8.3-pgsql zabbix-nginx-conf zabbix-sql-scripts zabbix-agent systemd-sysv"
 ```
 
 The Zabbix package downloader runs in `ANSIBLE_ZABBIX_AGENT_DOWNLOAD_IMAGE`.

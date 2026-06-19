@@ -540,7 +540,7 @@ zabbix-agent2
 The default server packages are:
 
 ```text
-zabbix-server-pgsql zabbix-frontend-php php8.3-pgsql zabbix-nginx-conf zabbix-sql-scripts zabbix-agent
+zabbix-server-pgsql zabbix-frontend-php php8.3-pgsql zabbix-nginx-conf zabbix-sql-scripts zabbix-agent systemd-sysv
 ```
 
 Override `ANSIBLE_ZABBIX_AGENT_RELEASE_URL` and
