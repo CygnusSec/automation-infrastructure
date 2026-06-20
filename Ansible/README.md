@@ -61,6 +61,7 @@ Common task runbooks:
 - [Docker](docs/tasks/docker/README.md)
 - [Hostname](docs/tasks/hostname/README.md)
 - [Network](docs/tasks/network/README.md)
+- [Zabbix Server Install](docs/tasks/zabbix-server/README.md)
 - [Zabbix Agent 2 Install](docs/tasks/zabbix-agent/README.md)
 - [Zabbix Agent Uninstall](docs/tasks/zabbix-agent-uninstall/README.md)
 - [MariaDB Native Package Remove](docs/tasks/mariadb-remove/README.md)
@@ -124,6 +125,7 @@ out of this README and use placeholder comments as a template:
 # ANSIBLE_SWARM_CACHE_SERVER_INT_HOSTS="<cache-int-ip-1>,<cache-int-ip-2>"
 # ANSIBLE_SWARM_CACHE_SERVER_INT_TAGS="cache-server-int-01,cache-server-int-02"
 # ANSIBLE_SSH_COPY_ID_EXTRA_HOSTS="<extra-ip-1>,<extra-ip-2>"
+# ANSIBLE_ZABBIX_SERVER_HOSTS="<zabbix-server-ip>"
 # ANSIBLE_ZABBIX_AGENT_HOSTS="<agent-ip-1>,<agent-ip-2>"
 ```
 
@@ -206,7 +208,7 @@ Tag-to-env mapping:
 | `base`, `prerequisite`, `docker` | `env.d/20-base.env` |
 | `mariadb_remove` | `env.d/20-base.env` |
 | `hostname`, `network` | `env.d/25-host-network.env` |
-| `zabbix`, `zabbix_agent`, `zabbix_agent_uninstall` | `env.d/30-zabbix-agent.env` |
+| `zabbix`, `zabbix_server`, `zabbix_agent`, `zabbix_agent_uninstall` | `env.d/30-zabbix-agent.env` |
 | `dns_time_services`, `dns_server`, `time_server`, `ntp_client` | `env.d/40-dns-time.env` |
 | `external_disk` | `env.d/50-external-disk.env` |
 | `docker_swarm`, `docker_swarm_iptables` | `env.d/60-docker-swarm.env` |
@@ -520,22 +522,32 @@ project/repo/docker-images/chrony.tar
 ```
 
 It also downloads Zabbix Agent 2 offline `.deb` packages into
-`project/repo/zabbix` when `ANSIBLE_ZABBIX_AGENT_DOWNLOAD_PACKAGES=true` or
-unset. The default Zabbix repository package is:
+`project/repo/zabbix` and Zabbix Server offline `.deb` packages into
+`project/repo/zabbix-server` when `ANSIBLE_ZABBIX_AGENT_DOWNLOAD_PACKAGES=true`
+and `ANSIBLE_ZABBIX_SERVER_DOWNLOAD_PACKAGES=true` or unset. The default
+Zabbix repository package is:
 
 ```text
 https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb
 ```
 
-The default downloaded packages are:
+The default agent packages are:
 
 ```text
 zabbix-agent2
 ```
 
+The default server packages are:
+
+```text
+zabbix-server-pgsql zabbix-frontend-php php8.3-pgsql zabbix-nginx-conf zabbix-sql-scripts zabbix-agent systemd-sysv
+```
+
 Override `ANSIBLE_ZABBIX_AGENT_RELEASE_URL` and
 `ANSIBLE_ZABBIX_AGENT_OFFLINE_PACKAGES` in `env.d/90-offline-bundle.env` if you
-need a different Ubuntu or Zabbix version. The downloader image defaults to
+need a different Ubuntu or Zabbix agent version. Override
+`ANSIBLE_ZABBIX_SERVER_RELEASE_URL` and `ANSIBLE_ZABBIX_SERVER_OFFLINE_PACKAGES`
+for server packages. The downloader image defaults to
 `ANSIBLE_ZABBIX_AGENT_DOWNLOAD_IMAGE=ubuntu:24.04`.
 
 This creates:
@@ -750,10 +762,34 @@ docker_swarm_group_labels:
 Host-level `docker_swarm_node_labels` can add or override labels for a specific
 node.
 
-## Zabbix Agent
+## Zabbix Server And Agent
 
-The Ansible control machine is treated as the Zabbix server. Target hosts get a
-Zabbix Agent configuration that points back to that control machine.
+Zabbix server hosts come from `env.d/10-inventory.env`:
+
+```env
+# ANSIBLE_ZABBIX_SERVER_HOSTS=<zabbix-server-ip>
+```
+
+Install the Zabbix Server PostgreSQL packages with:
+
+```env
+# ANSIBLE_ZABBIX_SERVER_ENABLED=true
+# ANSIBLE_ZABBIX_SERVER_TARGET_GROUP=zabbix_server_targets
+# ANSIBLE_ZABBIX_SERVER_INSTALL_FROM_LOCAL_REPO=true
+# ANSIBLE_ZABBIX_SERVER_REPO_SOURCE=./repo/zabbix-server
+# ANSIBLE_ZABBIX_SERVER_REPO_DEST=/media/installation/zabbix
+# ANSIBLE_ZABBIX_SERVER_MANAGE_APT_REPO=true
+# ANSIBLE_ZABBIX_SERVER_PACKAGES=[zabbix-server-pgsql, zabbix-frontend-php, php8.3-pgsql, zabbix-nginx-conf, zabbix-sql-scripts, zabbix-agent]
+```
+
+Run only Zabbix Server installation:
+
+```bash
+./scripts/run-ansible.sh deploy --tags zabbix_server
+```
+
+Target hosts get a Zabbix Agent configuration that points back to the Zabbix
+server.
 
 Set these values in `env.d/30-zabbix-agent.env`. Use comments as a template
 and fill the real server address only in your local env file:

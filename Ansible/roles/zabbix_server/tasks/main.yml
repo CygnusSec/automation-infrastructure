@@ -1,0 +1,146 @@
+---
+- name: Validate Zabbix server package configuration
+  ansible.builtin.assert:
+    that:
+      - zabbix_server_packages is sequence
+      - zabbix_server_packages | length > 0
+      - "'zabbix-server-pgsql' in zabbix_server_packages"
+    fail_msg: "Set zabbix_server_packages and keep zabbix-server-pgsql in the package list."
+  tags:
+    - zabbix
+    - zabbix_server
+
+- name: Download Zabbix apt repository package
+  ansible.builtin.get_url:
+    url: "{{ zabbix_server_release_url }}"
+    dest: "{{ zabbix_server_release_package_path }}"
+    mode: "0644"
+  when:
+    - zabbix_server_manage_apt_repo | bool
+    - not zabbix_server_install_from_local_repo | bool
+  tags:
+    - zabbix
+    - zabbix_server
+
+- name: Install Zabbix apt repository package
+  ansible.builtin.apt:
+    deb: "{{ zabbix_server_release_package_path }}"
+  when:
+    - zabbix_server_manage_apt_repo | bool
+    - not zabbix_server_install_from_local_repo | bool
+  tags:
+    - zabbix
+    - zabbix_server
+
+- name: Update apt cache for Zabbix server
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: not zabbix_server_install_from_local_repo | bool
+  tags:
+    - zabbix
+    - zabbix_server
+
+- name: Install Zabbix server packages
+  ansible.builtin.apt:
+    name: "{{ zabbix_server_packages }}"
+    state: present
+  when: not zabbix_server_install_from_local_repo | bool
+  tags:
+    - zabbix
+    - zabbix_server
+
+- name: Create Zabbix server local repo directory
+  ansible.builtin.file:
+    path: "{{ zabbix_server_repo_dest }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: zabbix_server_install_from_local_repo | bool
+  tags:
+    - zabbix
+    - zabbix_server
+
+- name: Resolve Zabbix server local deb repository source on control
+  ansible.builtin.set_fact:
+    zabbix_server_repo_source_resolved: >-
+      {{
+        zabbix_server_repo_source
+        if zabbix_server_repo_source.startswith('/')
+        else playbook_dir ~ '/../' ~ zabbix_server_repo_source
+      }}
+  when: zabbix_server_install_from_local_repo | bool
+  tags:
+    - zabbix
+    - zabbix_server
+
+- name: Check Zabbix server local deb repository source
+  ansible.builtin.stat:
+    path: "{{ zabbix_server_repo_source_resolved }}"
+  register: zabbix_server_repo_source_stat
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when: zabbix_server_install_from_local_repo | bool
+  tags:
+    - zabbix
+    - zabbix_server
+
+- name: Copy Zabbix server local deb repository
+  ansible.builtin.copy:
+    src: "{{ zabbix_server_repo_source_resolved }}/"
+    dest: "{{ zabbix_server_repo_dest }}/"
+    owner: root
+    group: root
+    mode: preserve
+  when:
+    - zabbix_server_install_from_local_repo | bool
+    - zabbix_server_repo_source_stat.stat.exists
+  tags:
+    - zabbix
+    - zabbix_server
+
+- name: Find Zabbix server deb packages
+  ansible.builtin.find:
+    paths: "{{ zabbix_server_repo_dest }}"
+    patterns: "*.deb"
+    file_type: file
+  register: zabbix_server_local_debs
+  when: zabbix_server_install_from_local_repo | bool
+  tags:
+    - zabbix
+    - zabbix_server
+
+- name: Validate Zabbix server local deb repository
+  ansible.builtin.assert:
+    that:
+      - zabbix_server_local_debs.matched | int > 0
+      - >-
+        zabbix_server_local_debs.files
+        | map(attribute='path')
+        | select('search', '/zabbix-server-pgsql_[^/]*\\.deb$')
+        | list
+        | length > 0
+    fail_msg: >-
+      No zabbix-server-pgsql .deb files found in {{ zabbix_server_repo_dest }}
+      on {{ inventory_hostname }}. The control source
+      {{ zabbix_server_repo_source_resolved }} is
+      {{ 'available' if zabbix_server_repo_source_stat.stat.exists else 'missing' }}.
+      Add Zabbix server and dependency .deb files to the control repo before
+      running offline.
+  when: zabbix_server_install_from_local_repo | bool
+  tags:
+    - zabbix
+    - zabbix_server
+
+- name: Install Zabbix server from local deb repository
+  ansible.builtin.shell: >-
+    apt-get install -y
+    {{ zabbix_server_local_debs.files | map(attribute='path') | sort | map('quote') | join(' ') }}
+  args:
+    executable: /bin/bash
+  when: zabbix_server_install_from_local_repo | bool
+  tags:
+    - zabbix
+    - zabbix_server

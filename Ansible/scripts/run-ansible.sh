@@ -286,7 +286,7 @@ fi
 # Any non-empty host var from 10-inventory.env proves the env was sourced.
 _preflight_has_hosts="false"
 for _pf_var in ANSIBLE_SWARM_MANAGER_HOSTS ANSIBLE_ALL_TARGET_HOSTS \
-               ANSIBLE_ZABBIX_AGENT_HOSTS ANSIBLE_DNS_TIME_SERVER_HOSTS \
+               ANSIBLE_ZABBIX_SERVER_HOSTS ANSIBLE_ZABBIX_AGENT_HOSTS ANSIBLE_DNS_TIME_SERVER_HOSTS \
                ANSIBLE_EXTERNAL_DISK_HOSTS ANSIBLE_TLDH_DATABASE_MASTER_HOST; do
   if [[ -n "${!_pf_var:-}" ]]; then
     _preflight_has_hosts="true"

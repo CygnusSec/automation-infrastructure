@@ -67,7 +67,7 @@ def connection_vars(become):
 def build_inventory():
     inventory = {
         "_meta": {"hostvars": {}},
-        "all": {"children": ["all_targets", "ssh_copy_id_targets", "linux", "zabbix_agent_targets", "dns_time_servers", "external_disk_targets", "tldh_database_targets"]},
+        "all": {"children": ["all_targets", "ssh_copy_id_targets", "linux", "zabbix_server_targets", "zabbix_agent_targets", "dns_time_servers", "external_disk_targets", "tldh_database_targets"]},
     }
 
     manager_hosts = csv_env("ANSIBLE_SWARM_MANAGER_HOSTS", os.environ.get("ANSIBLE_MANAGER_1_HOST", ""))
@@ -79,6 +79,7 @@ def build_inventory():
     cache_int_hosts = csv_env("ANSIBLE_SWARM_CACHE_SERVER_INT_HOSTS")
     cache_int_tags = csv_env("ANSIBLE_SWARM_CACHE_SERVER_INT_TAGS")
     ssh_extra_hosts = csv_env("ANSIBLE_SSH_COPY_ID_EXTRA_HOSTS")
+    zabbix_server_hosts = csv_env("ANSIBLE_ZABBIX_SERVER_HOSTS")
     zabbix_hosts = csv_env("ANSIBLE_ZABBIX_AGENT_HOSTS")
     dns_time_hosts = csv_env("ANSIBLE_DNS_TIME_SERVER_HOSTS")
     external_disk_hosts = csv_env("ANSIBLE_EXTERNAL_DISK_HOSTS")
@@ -197,12 +198,17 @@ def build_inventory():
         alias = ip_to_alias.get(ip, host_alias("target", ip))
         add_host(inventory, "all_targets", alias, ip, advertise=False)
 
+    for ip in zabbix_server_hosts:
+        alias = ip_to_alias.get(ip, host_alias("zabbix-server", ip))
+        add_host(inventory, "zabbix_server_targets", alias, ip, advertise=False)
+
     for ip in zabbix_hosts:
         alias = ip_to_alias.get(ip, host_alias("zabbix-agent", ip))
         add_host(inventory, "zabbix_agent_targets", alias, ip, advertise=False)
 
     set_group_vars(inventory, "linux", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
     set_group_vars(inventory, "all_targets", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
+    set_group_vars(inventory, "zabbix_server_targets", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
     set_group_vars(inventory, "zabbix_agent_targets", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
     set_group_vars(inventory, "dns_time_servers", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
     set_group_vars(inventory, "external_disk_targets", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))

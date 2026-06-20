@@ -26,6 +26,10 @@ ANSIBLE_ZABBIX_AGENT_DOWNLOAD_IMAGE="${ANSIBLE_ZABBIX_AGENT_DOWNLOAD_IMAGE:-ubun
 ANSIBLE_ZABBIX_AGENT_REPO_SOURCE="${ANSIBLE_ZABBIX_AGENT_REPO_SOURCE:-./repo/zabbix}"
 ANSIBLE_ZABBIX_AGENT_RELEASE_URL="${ANSIBLE_ZABBIX_AGENT_RELEASE_URL:-https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb}"
 ANSIBLE_ZABBIX_AGENT_OFFLINE_PACKAGES="${ANSIBLE_ZABBIX_AGENT_OFFLINE_PACKAGES:-zabbix-agent2}"
+ANSIBLE_ZABBIX_SERVER_DOWNLOAD_PACKAGES="${ANSIBLE_ZABBIX_SERVER_DOWNLOAD_PACKAGES:-true}"
+ANSIBLE_ZABBIX_SERVER_REPO_SOURCE="${ANSIBLE_ZABBIX_SERVER_REPO_SOURCE:-./repo/zabbix-server}"
+ANSIBLE_ZABBIX_SERVER_RELEASE_URL="${ANSIBLE_ZABBIX_SERVER_RELEASE_URL:-${ANSIBLE_ZABBIX_AGENT_RELEASE_URL}}"
+ANSIBLE_ZABBIX_SERVER_OFFLINE_PACKAGES="${ANSIBLE_ZABBIX_SERVER_OFFLINE_PACKAGES:-zabbix-server-pgsql zabbix-frontend-php php8.3-pgsql zabbix-nginx-conf zabbix-sql-scripts zabbix-agent systemd-sysv}"
 
 if [[ "${RUNTIME_IMAGE}" == *.tar || "${RUNTIME_IMAGE}" == *.tar.gz ]]; then
   echo "Ignoring RUNTIME_IMAGE tar path while building bundle: ${RUNTIME_IMAGE}"
@@ -70,18 +74,21 @@ build_service_image() {
   docker save "${image}" -o "${tar_path}"
 }
 
-download_zabbix_agent_packages() {
+download_zabbix_packages() {
   local repo_dir="$1"
+  local release_url="$2"
+  local packages="$3"
+  local label="$4"
 
   mkdir -p "${repo_dir}"
 
-  echo "Downloading Zabbix Agent 2 offline packages into: ${repo_dir}"
+  echo "Downloading ${label} offline packages into: ${repo_dir}"
   docker run --rm \
     --tmpfs /tmp:exec,mode=1777 \
     --tmpfs /var/lib/apt/lists:exec,mode=755 \
     --tmpfs /var/cache/apt:exec,mode=755 \
-    -e "ZABBIX_RELEASE_URL=${ANSIBLE_ZABBIX_AGENT_RELEASE_URL}" \
-    -e "ZABBIX_PACKAGES=${ANSIBLE_ZABBIX_AGENT_OFFLINE_PACKAGES}" \
+    -e "ZABBIX_RELEASE_URL=${release_url}" \
+    -e "ZABBIX_PACKAGES=${packages}" \
     -v "${repo_dir}:/zabbix-debs" \
     "${ANSIBLE_ZABBIX_AGENT_DOWNLOAD_IMAGE}" \
     bash -lc '
@@ -105,7 +112,19 @@ download_zabbix_agent_packages() {
 }
 
 if [[ "${ANSIBLE_ZABBIX_AGENT_DOWNLOAD_PACKAGES}" == "true" ]]; then
-  download_zabbix_agent_packages "$(project_path "${ANSIBLE_ZABBIX_AGENT_REPO_SOURCE}")"
+  download_zabbix_packages \
+    "$(project_path "${ANSIBLE_ZABBIX_AGENT_REPO_SOURCE}")" \
+    "${ANSIBLE_ZABBIX_AGENT_RELEASE_URL}" \
+    "${ANSIBLE_ZABBIX_AGENT_OFFLINE_PACKAGES}" \
+    "Zabbix Agent 2"
+fi
+
+if [[ "${ANSIBLE_ZABBIX_SERVER_DOWNLOAD_PACKAGES}" == "true" ]]; then
+  download_zabbix_packages \
+    "$(project_path "${ANSIBLE_ZABBIX_SERVER_REPO_SOURCE}")" \
+    "${ANSIBLE_ZABBIX_SERVER_RELEASE_URL}" \
+    "${ANSIBLE_ZABBIX_SERVER_OFFLINE_PACKAGES}" \
+    "Zabbix Server"
 fi
 
 if [[ "${ANSIBLE_DNS_TIME_SERVICES_BUILD_IMAGES}" == "true" ]]; then

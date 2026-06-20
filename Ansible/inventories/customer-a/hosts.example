@@ -2,7 +2,8 @@
 # Static inventory example only.
 # The active inventory is inventories/customer-a/inventory.py, configured in
 # ansible.cfg. Manage real host lists in env.d/*.env with ANSIBLE_SWARM_*,
-# ANSIBLE_SSH_COPY_ID_EXTRA_HOSTS, and ANSIBLE_ZABBIX_AGENT_HOSTS.
+# ANSIBLE_SSH_COPY_ID_EXTRA_HOSTS, ANSIBLE_ZABBIX_SERVER_HOSTS, and
+# ANSIBLE_ZABBIX_AGENT_HOSTS.
 all:
   children:
     swarm_managers:
