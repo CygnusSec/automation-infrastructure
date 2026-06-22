@@ -37,7 +37,7 @@ load_ansible_env() {
   env_file_for_tag() {
     local tag="$1"
     case "${tag}" in
-      base|prerequisite|docker|mariadb_remove)
+      base|prerequisite|docker|iptables|iptables_block|mariadb_remove)
         printf '%s\n' "20-base.env"
         ;;
       hostname|network)
@@ -52,7 +52,7 @@ load_ansible_env() {
       external_disk)
         printf '%s\n' "50-external-disk.env"
         ;;
-      docker_swarm|docker_swarm_iptables|docker_swarm_labels|docker_swarm_reset)
+      docker_swarm|docker_swarm_iptables|docker_swarm_labels|docker_swarm_reset|docker_swarm_leave)
         printf '%s\n' "60-docker-swarm.env"
         ;;
       tldh_database)

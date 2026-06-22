@@ -4,6 +4,7 @@ This repository prepares Ubuntu hosts and runs common operations tasks:
 
 - install baseline packages
 - configure sysctl, limits, and swap
+- configure common iptables ACCEPT rules
 - install Docker and Docker Compose v2
 - configure Zabbix Agent
 - change hostnames
@@ -59,6 +60,7 @@ Common task runbooks:
 - [Base Preparation](docs/tasks/base/README.md)
 - [Prerequisite](docs/tasks/prerequisite/README.md)
 - [Docker](docs/tasks/docker/README.md)
+- [iptables](docs/tasks/iptables/README.md)
 - [Hostname](docs/tasks/hostname/README.md)
 - [Network](docs/tasks/network/README.md)
 - [Zabbix Server Install](docs/tasks/zabbix-server/README.md)
@@ -125,6 +127,7 @@ out of this README and use placeholder comments as a template:
 # ANSIBLE_SWARM_CACHE_SERVER_INT_HOSTS="<cache-int-ip-1>,<cache-int-ip-2>"
 # ANSIBLE_SWARM_CACHE_SERVER_INT_TAGS="cache-server-int-01,cache-server-int-02"
 # ANSIBLE_SSH_COPY_ID_EXTRA_HOSTS="<extra-ip-1>,<extra-ip-2>"
+# ANSIBLE_IPTABLES_HOSTS="<iptables-target-ip-1>,<iptables-target-ip-2>"
 # ANSIBLE_ZABBIX_SERVER_HOSTS="<zabbix-server-ip>"
 # ANSIBLE_ZABBIX_AGENT_HOSTS="<agent-ip-1>,<agent-ip-2>"
 ```
@@ -205,7 +208,7 @@ Tag-to-env mapping:
 
 | Tags | Env file |
 | --- | --- |
-| `base`, `prerequisite`, `docker` | `env.d/20-base.env` |
+| `base`, `prerequisite`, `docker`, `iptables` | `env.d/20-base.env` |
 | `mariadb_remove` | `env.d/20-base.env` |
 | `hostname`, `network` | `env.d/25-host-network.env` |
 | `zabbix`, `zabbix_server`, `zabbix_agent`, `zabbix_agent_uninstall` | `env.d/30-zabbix-agent.env` |
@@ -724,13 +727,10 @@ docker_swarm_worker_group: swarm_workers
 docker_swarm_listen_addr: "<listen-ip>:2377"
 docker_swarm_port: 2377
 docker_swarm_force_reset: false
+docker_swarm_leave_force: true
 docker_swarm_manager_addr: ""
 docker_swarm_manage_iptables: false
-docker_swarm_iptables_source_cidr: "<source-cidr>"
 docker_swarm_manage_encrypted_overlay_esp: false
-docker_swarm_service_ports:
-  - port: 80
-    protocol: tcp
 ```
 
 The first host in `swarm_managers` becomes the primary manager. The role
@@ -739,13 +739,23 @@ managers and workers automatically. If `docker_swarm_manager_addr` is empty, the
 role uses the primary manager's `docker_swarm_advertise_addr`, then `ansible_host`,
 then `inventory_hostname`.
 
+To make selected targets leave their current Swarm, run:
+
+```bash
+./scripts/run-ansible.sh deploy --tags docker_swarm_leave
+```
+
 Docker Swarm iptables is a separate run. `--tags docker_swarm` only initializes
 and joins Swarm nodes. If `docker_swarm_manage_iptables: true`, run
-`--tags docker_swarm_iptables` to open the standard Swarm iptables rules:
-`2377/tcp` on manager nodes, `7946/tcp`, `7946/udp`, and `4789/udp` on all
-manager/worker nodes. Set `docker_swarm_manage_encrypted_overlay_esp: true` to
-allow IP protocol `50` (`esp`) when using encrypted overlay networks. Add
-published application ports to `docker_swarm_service_ports`.
+`--tags docker_swarm_iptables` to open Swarm peer rules from the configured
+`swarm_managers` and `swarm_workers` inventory groups. The task skips each
+node's own IP and allows manager join traffic on `2377/tcp`, node discovery on
+`7946/tcp` and `7946/udp`, and overlay networking on `4789/udp`. Set
+`docker_swarm_manage_encrypted_overlay_esp: true` to allow IP protocol `50`
+(`esp`) when using encrypted overlay networks.
+
+Service source IPs and external service IP/port lists are managed by the
+separate `iptables` role through `INPUT` and `OUTPUT` chains.
 
 Node labels can be assigned by inventory group:
 

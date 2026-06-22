@@ -19,6 +19,8 @@ alphabetic order.
 | [Base Preparation](base/README.md) | Run prerequisite and Docker roles together. | `./scripts/run-ansible.sh deploy --tags base` |
 | [Prerequisite](prerequisite/README.md) | Validate Ubuntu, install baseline packages, sysctl, limits, swap, timezone, UFW. | `./scripts/run-ansible.sh deploy --tags prerequisite` |
 | [Docker](docker/README.md) | Install Docker and Docker Compose v2. | `./scripts/run-ansible.sh deploy --tags docker` |
+| [iptables](iptables/README.md) | Add common loopback, SSH, service source, and external service ACCEPT rules. | `./scripts/run-ansible.sh deploy --tags iptables` |
+| [iptables Block](iptables/README.md) | Set `INPUT` and `OUTPUT` policies to `DROP` after allow rules are ready. | `./scripts/run-ansible.sh deploy --tags iptables_block` |
 | [Hostname](hostname/README.md) | Set Linux hostnames and `/etc/hosts`. | `./scripts/run-ansible.sh deploy --tags hostname` |
 | [Network](network/README.md) | Apply static Netplan settings. | `./scripts/run-ansible.sh deploy --tags network` |
 | [Zabbix Server Install](zabbix-server/README.md) | Install Zabbix Server packages for PostgreSQL. | `./scripts/run-ansible.sh deploy --tags zabbix_server` |
@@ -32,6 +34,7 @@ alphabetic order.
 | [TLDH Database](tldh-database/README.md) | Deploy MariaDB master/slave containers. | `./scripts/run-ansible.sh deploy --tags tldh_database` |
 | [External Disk](external-disk/README.md) | Partition, format, mount, and persist an external disk. | `./scripts/run-ansible.sh deploy --tags external_disk` |
 | [Docker Swarm](docker-swarm/README.md) | Initialize Swarm and join worker nodes. | `./scripts/run-ansible.sh deploy --tags docker_swarm` |
+| [Docker Swarm Leave](docker-swarm/README.md) | Make selected nodes leave their current Swarm. | `./scripts/run-ansible.sh deploy --tags docker_swarm_leave` |
 | [Docker Swarm iptables](docker-swarm-iptables/README.md) | Open Swarm and published service ports. | `./scripts/run-ansible.sh deploy --tags docker_swarm_iptables` |
 | [Offline Bundle Build](offline-bundle/README.md) | Build a portable offline Ansible bundle on an online machine. | `./scripts/build-offline-bundle.sh` |
 | [Offline Control Prepare](offline-control/README.md) | Load the packaged runtime image on the offline control machine. | `./scripts/prepare-offline-control.sh` |

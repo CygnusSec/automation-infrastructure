@@ -20,6 +20,7 @@ ANSIBLE_DOCKER_SWARM_LISTEN_ADDR=<listen-ip>:2377
 ANSIBLE_DOCKER_SWARM_PORT=2377
 # ANSIBLE_DOCKER_SWARM_MANAGER_ADDR=<manager-ip>
 ANSIBLE_DOCKER_SWARM_FORCE_RESET=false
+ANSIBLE_DOCKER_SWARM_LEAVE_FORCE=true
 ANSIBLE_DOCKER_SWARM_GROUP_LABELS="{}"
 ANSIBLE_DOCKER_SWARM_NODE_LABELS="{}"
 ```
@@ -49,6 +50,19 @@ Then run:
 ```
 
 Set it back to `false` after the run.
+
+## Leave Swarm
+
+Use this when you intentionally want the selected manager/worker targets to
+leave their current Swarm:
+
+```bash
+./scripts/run-ansible.sh deploy --tags docker_swarm_leave
+```
+
+`ANSIBLE_DOCKER_SWARM_LEAVE_FORCE=true` is the default so manager nodes can
+leave as well. Set it to `false` only when you want Docker to reject manager
+leave operations that require force.
 
 ## Verification
 

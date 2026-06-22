@@ -1,0 +1,28 @@
+---
+- name: Ensure Docker service is running before Swarm leave
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: true
+    daemon_reload: true
+  become: true
+  tags:
+    - docker_swarm_leave
+
+- name: Check Docker Swarm state before leave
+  ansible.builtin.command: docker info --format '{{ "{{" }} .Swarm.LocalNodeState {{ "}}" }}'
+  register: docker_swarm_leave_state
+  changed_when: false
+  become: true
+  tags:
+    - docker_swarm_leave
+
+- name: Leave Docker Swarm
+  ansible.builtin.command:
+    argv: "{{ ['docker', 'swarm', 'leave'] + (['--force'] if docker_swarm_leave_force | bool else []) }}"
+  register: docker_swarm_leave_result
+  changed_when: docker_swarm_leave_result.rc == 0
+  become: true
+  when: docker_swarm_leave_state.stdout | default('inactive') != 'inactive'
+  tags:
+    - docker_swarm_leave

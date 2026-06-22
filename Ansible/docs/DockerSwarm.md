@@ -82,11 +82,7 @@ docker_swarm_port: 2377
 docker_swarm_force_reset: false
 docker_swarm_manager_addr: ""
 docker_swarm_manage_iptables: true
-docker_swarm_iptables_source_cidr: "<source-cidr>"
 docker_swarm_manage_encrypted_overlay_esp: false
-docker_swarm_service_ports:
-  - port: 80
-    protocol: tcp
 ```
 
 If each host needs an advertise IP different from `inventory_hostname`, define it
@@ -280,25 +276,19 @@ The role can create the required iptables rules automatically:
 
 ```yaml
 docker_swarm_manage_iptables: true
-docker_swarm_iptables_source_cidr: "<source-cidr>"
 docker_swarm_manage_encrypted_overlay_esp: false
 ```
 
-The role opens `2377/tcp` only on manager nodes. It opens `7946/tcp`,
-`7946/udp`, and `4789/udp` on all manager/worker nodes. Enable
-`docker_swarm_manage_encrypted_overlay_esp` only when using encrypted overlay
-networks with `--opt encrypted`.
+The role builds peer IPs from the configured `swarm_managers` and
+`swarm_workers` inventory groups, skips each node's own IP, and opens:
 
-Published application ports are not predictable from the Swarm role. Add them
-explicitly:
+- `2377/tcp` between nodes and managers
+- `7946/tcp` and `7946/udp` for node discovery
+- `4789/udp` for overlay networking
+- IP protocol `50` / `esp` when encrypted overlay support is enabled
 
-```yaml
-docker_swarm_service_ports:
-  - port: 80
-    protocol: tcp
-  - port: 443
-    protocol: tcp
-```
+Published application ports, service source IPs, and external service IP/port
+lists are handled by the separate `iptables` role.
 
 ## Verify After Creating The Cluster
 

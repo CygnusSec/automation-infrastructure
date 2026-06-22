@@ -33,7 +33,7 @@ numbers to keep the order predictable.
 ```text
 .env                         # common runtime, SSH, and secrets
 env.d/10-inventory.env       # host lists and inventory groups
-env.d/20-base.env            # prerequisite and Docker
+env.d/20-base.env            # prerequisite, Docker, iptables, MariaDB cleanup
 env.d/25-host-network.env    # hostname and network
 env.d/30-zabbix-agent.env    # Zabbix Server and Agent 2
 env.d/40-dns-time.env        # DNS/time services and NTP clients
@@ -47,10 +47,10 @@ env.d/90-offline-bundle.env  # online build/offline bundle settings
 
 | Tags | Env file |
 | --- | --- |
-| `base`, `prerequisite`, `docker`, `mariadb_remove` | `20-base.env` |
+| `base`, `prerequisite`, `docker`, `iptables`, `iptables_block`, `mariadb_remove` | `20-base.env` |
 | `hostname`, `network` | `25-host-network.env` |
 | `zabbix`, `zabbix_server`, `zabbix_agent`, `zabbix_agent_uninstall` | `30-zabbix-agent.env` |
 | `dns_time_services`, `dns_server`, `time_server`, `ntp_client` | `40-dns-time.env` |
 | `external_disk` | `50-external-disk.env` |
-| `docker_swarm`, `docker_swarm_iptables` | `60-docker-swarm.env` |
+| `docker_swarm`, `docker_swarm_leave`, `docker_swarm_iptables` | `60-docker-swarm.env` |
 | `tldh_database` | `70-tldh-database.env` |

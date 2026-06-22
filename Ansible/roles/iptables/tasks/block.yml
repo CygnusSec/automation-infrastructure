@@ -1,0 +1,36 @@
+---
+- name: Validate iptables block chains
+  ansible.builtin.assert:
+    that:
+      - iptables_block_chains is sequence
+      - iptables_block_chains | length > 0
+      - item in ['INPUT', 'OUTPUT']
+    fail_msg: "iptables_block_chains only supports INPUT and OUTPUT: {{ item }}"
+  loop: "{{ iptables_block_chains }}"
+  tags:
+    - iptables_block
+
+- name: Check iptables chain policies before block
+  ansible.builtin.command:
+    argv:
+      - iptables
+      - -S
+      - "{{ item }}"
+  register: iptables_block_policy_check
+  changed_when: false
+  loop: "{{ iptables_block_chains | unique }}"
+  tags:
+    - iptables_block
+
+- name: Block iptables INPUT and OUTPUT chains
+  ansible.builtin.command:
+    argv:
+      - iptables
+      - -P
+      - "{{ item.item }}"
+      - DROP
+  changed_when: true
+  loop: "{{ iptables_block_policy_check.results }}"
+  when: ("-P " ~ item.item ~ " DROP") not in item.stdout_lines
+  tags:
+    - iptables_block

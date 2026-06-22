@@ -54,6 +54,24 @@ docker_packages:
 docker_users:
   - "{{ ansible_user }}"
 
+# Common iptables role
+iptables_enabled: "{{ (lookup('env', 'ANSIBLE_IPTABLES_ENABLED') | default('false', true)) | bool }}"
+iptables_target_group: "{{ lookup('env', 'ANSIBLE_IPTABLES_TARGET_GROUP') | default('iptables_targets', true) }}"
+iptables_ssh_whitelist_ips_raw: "{{ lookup('env', 'ANSIBLE_IPTABLES_SSH_WHITELIST_IPS') | default('', true) }}"
+iptables_ssh_port: "{{ (lookup('env', 'ANSIBLE_IPTABLES_SSH_PORT') | default('22', true)) | int }}"
+iptables_service_allowed_source_ips: "{{ lookup('env', 'ANSIBLE_IPTABLES_SERVICE_ALLOWED_SOURCE_IPS') | default('[]', true) | from_yaml }}"
+iptables_external_service_rules: "{{ lookup('env', 'ANSIBLE_IPTABLES_EXTERNAL_SERVICE_RULES') | default('[]', true) | from_yaml }}"
+iptables_ip_port_rules: "{{ lookup('env', 'ANSIBLE_IPTABLES_IP_PORT_RULES') | default('[]', true) | from_yaml }}"
+iptables_zabbix_server_ips: "{{ lookup('env', 'ANSIBLE_IPTABLES_ZABBIX_SERVER_IPS') | default('[]', true) | from_yaml }}"
+iptables_zabbix_agent_port: "{{ (lookup('env', 'ANSIBLE_IPTABLES_ZABBIX_AGENT_PORT') | default('10050', true)) | int }}"
+iptables_zabbix_server_port: "{{ (lookup('env', 'ANSIBLE_IPTABLES_ZABBIX_SERVER_PORT') | default('10051', true)) | int }}"
+iptables_dns_time_server_ips: "{{ lookup('env', 'ANSIBLE_IPTABLES_DNS_TIME_SERVER_IPS') | default('[]', true) | from_yaml }}"
+iptables_dns_time_client_sources: "{{ lookup('env', 'ANSIBLE_IPTABLES_DNS_TIME_CLIENT_SOURCES') | default('[]', true) | from_yaml }}"
+iptables_dns_port: "{{ (lookup('env', 'ANSIBLE_IPTABLES_DNS_PORT') | default('53', true)) | int }}"
+iptables_time_port: "{{ (lookup('env', 'ANSIBLE_IPTABLES_TIME_PORT') | default('123', true)) | int }}"
+iptables_block_enabled: "{{ (lookup('env', 'ANSIBLE_IPTABLES_BLOCK_ENABLED') | default('false', true)) | bool }}"
+iptables_block_chains: "{{ lookup('env', 'ANSIBLE_IPTABLES_BLOCK_CHAINS') | default('[INPUT, OUTPUT]', true) | from_yaml }}"
+
 # SSH bootstrap.
 ssh_copy_id_public_key_file: "{{ lookup('env', 'ANSIBLE_SSH_COPY_ID_PUBLIC_KEY_FILE') | default(ansible_ssh_private_key_file ~ '.pub', true) }}"
 ssh_copy_id_target_group: "{{ lookup('env', 'ANSIBLE_SSH_COPY_ID_TARGET_GROUP') | default('ssh_copy_id_targets', true) }}"
@@ -172,18 +190,10 @@ docker_swarm_worker_group: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_WORKER_GROUP'
 docker_swarm_listen_addr: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_LISTEN_ADDR') | default('0.0.0.0:2377', true) }}"
 docker_swarm_port: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_PORT') | default('2377', true)) | int }}"
 docker_swarm_force_reset: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_FORCE_RESET') | default('false', true)) | bool }}"
+docker_swarm_leave_force: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_LEAVE_FORCE') | default('true', true)) | bool }}"
 docker_swarm_manager_addr: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_MANAGER_ADDR') | default('', true) }}"
 docker_swarm_manage_iptables: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_MANAGE_IPTABLES') | default('false', true)) | bool }}"
-docker_swarm_iptables_source_cidr: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_IPTABLES_SOURCE_CIDR') | default('0.0.0.0/0', true) }}"
 docker_swarm_manage_encrypted_overlay_esp: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_MANAGE_ENCRYPTED_OVERLAY_ESP') | default('false', true)) | bool }}"
-# Add published application ports here when needed.
-# Example:
-# docker_swarm_service_ports:
-#   - port: 80
-#     protocol: tcp
-#   - port: 443
-#     protocol: tcp
-docker_swarm_service_ports: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_SERVICE_PORTS') | default('[]', true) | from_yaml }}"
 
 # Label nodes automatically after they join the Swarm.
 # Group labels apply to any inventory group listed here. Host-level

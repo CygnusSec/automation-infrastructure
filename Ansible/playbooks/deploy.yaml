@@ -46,6 +46,31 @@
   tags:
     - network
 
+- name: Configure common iptables rules
+  hosts: "{{ lookup('env', 'ANSIBLE_IPTABLES_TARGET_GROUP') | default('iptables_targets', true) }}"
+  gather_facts: false
+  become: true
+  roles:
+    - role: iptables
+      when: iptables_enabled | bool
+  tags:
+    - iptables
+
+- name: Block common iptables INPUT and OUTPUT
+  hosts: "{{ lookup('env', 'ANSIBLE_IPTABLES_TARGET_GROUP') | default('iptables_targets', true) }}"
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Block iptables INPUT and OUTPUT chains
+      ansible.builtin.include_role:
+        name: iptables
+        tasks_from: block
+      when: iptables_block_enabled | bool
+      tags:
+        - iptables_block
+  tags:
+    - iptables_block
+
 - name: Install Zabbix server
   hosts: "{{ lookup('env', 'ANSIBLE_ZABBIX_SERVER_TARGET_GROUP') | default('zabbix_server_targets', true) }}"
   gather_facts: false
@@ -191,6 +216,21 @@
       when: docker_swarm_enabled | bool
   tags:
     - docker_swarm
+
+- name: Leave Docker Swarm
+  hosts: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_TARGET_GROUP') | default('swarm_managers:swarm_workers', true) }}"
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Leave Docker Swarm
+      ansible.builtin.include_role:
+        name: docker_swarm
+        tasks_from: leave
+      when: docker_swarm_enabled | bool
+      tags:
+        - docker_swarm_leave
+  tags:
+    - docker_swarm_leave
 
 - name: Configure Docker Swarm iptables
   hosts: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_TARGET_GROUP') | default('swarm_managers:swarm_workers', true) }}"

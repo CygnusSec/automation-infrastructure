@@ -11,6 +11,12 @@ cd Ansible
 ./scripts/run-ansible.sh deploy --tags docker_swarm
 ```
 
+Leave Swarm:
+
+```bash
+./scripts/run-ansible.sh deploy --tags docker_swarm_leave
+```
+
 Use the configured sudo-capable SSH user, not `root`. The wrapper connects as
 `ANSIBLE_SSH_USER`; this role uses Ansible `become`/sudo for Docker commands.
 
@@ -51,23 +57,22 @@ docker_swarm_enabled: true
 docker_swarm_listen_addr: "<listen-ip>:2377"
 docker_swarm_port: 2377
 docker_swarm_force_reset: false
+docker_swarm_leave_force: true
 docker_swarm_manage_iptables: true
-docker_swarm_iptables_source_cidr: "<source-cidr>"
 docker_swarm_manage_encrypted_overlay_esp: false
-docker_swarm_service_ports:
-  - port: 80
-    protocol: tcp
 ```
 
-The role opens the standard Swarm rules with iptables:
+The iptables task builds peer IPs from `swarm_managers` and `swarm_workers`,
+skips each node's own IP, and opens the Swarm rules used by the legacy
+`allow_swarm` shell function:
 
-- `2377/tcp` on manager nodes
-- `7946/tcp` on all manager/worker nodes
-- `7946/udp` on all manager/worker nodes
-- `4789/udp` on all manager/worker nodes
+- manager join traffic on `2377/tcp`
+- node discovery on `7946/tcp` and `7946/udp`
+- overlay networking on `4789/udp`
 - IP protocol `50` / `esp` on all nodes when `docker_swarm_manage_encrypted_overlay_esp: true`
 
-Add published application ports to `docker_swarm_service_ports`.
+Service source IPs and external service IP/port lists are handled by the
+separate `iptables` role through `INPUT` and `OUTPUT` chains.
 
 Node labels can be applied by inventory group:
 
