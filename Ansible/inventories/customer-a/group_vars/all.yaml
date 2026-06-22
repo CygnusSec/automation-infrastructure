@@ -57,6 +57,8 @@ docker_users:
 # Common iptables role
 iptables_enabled: "{{ (lookup('env', 'ANSIBLE_IPTABLES_ENABLED') | default('false', true)) | bool }}"
 iptables_target_group: "{{ lookup('env', 'ANSIBLE_IPTABLES_TARGET_GROUP') | default('iptables_targets', true) }}"
+iptables_reset_enabled: "{{ (lookup('env', 'ANSIBLE_IPTABLES_RESET_ENABLED') | default('true', true)) | bool }}"
+iptables_reset_chains: "{{ lookup('env', 'ANSIBLE_IPTABLES_RESET_CHAINS') | default('[INPUT, OUTPUT]', true) | from_yaml }}"
 iptables_ssh_whitelist_ips_raw: "{{ lookup('env', 'ANSIBLE_IPTABLES_SSH_WHITELIST_IPS') | default('', true) }}"
 iptables_ssh_port: "{{ (lookup('env', 'ANSIBLE_IPTABLES_SSH_PORT') | default('22', true)) | int }}"
 iptables_service_allowed_source_ips: "{{ lookup('env', 'ANSIBLE_IPTABLES_SERVICE_ALLOWED_SOURCE_IPS') | default('[]', true) | from_yaml }}"

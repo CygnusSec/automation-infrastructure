@@ -1,6 +1,10 @@
 ---
 iptables_enabled: false
 iptables_target_group: iptables_targets
+iptables_reset_enabled: true
+iptables_reset_chains:
+  - INPUT
+  - OUTPUT
 iptables_ssh_whitelist_ips_raw: ""
 iptables_ssh_port: 22
 iptables_service_allowed_source_ips: []

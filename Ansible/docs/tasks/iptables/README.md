@@ -37,6 +37,8 @@ Set role options in `env.d/20-base.env`:
 ```env
 ANSIBLE_IPTABLES_ENABLED=true
 ANSIBLE_IPTABLES_TARGET_GROUP=iptables_targets
+ANSIBLE_IPTABLES_RESET_ENABLED=true
+ANSIBLE_IPTABLES_RESET_CHAINS="[INPUT, OUTPUT]"
 ANSIBLE_IPTABLES_SSH_WHITELIST_IPS="172.16.3.21,172.16.3.22"
 ANSIBLE_IPTABLES_SSH_PORT=22
 ANSIBLE_IPTABLES_SERVICE_ALLOWED_SOURCE_IPS="[172.16.3.97, 172.16.3.98]"
@@ -46,7 +48,7 @@ ANSIBLE_IPTABLES_ZABBIX_SERVER_IPS="[172.16.5.57]"
 ANSIBLE_IPTABLES_ZABBIX_AGENT_PORT=10050
 ANSIBLE_IPTABLES_ZABBIX_SERVER_PORT=10051
 ANSIBLE_IPTABLES_DNS_TIME_SERVER_IPS="[172.16.3.200, 172.16.3.201]"
-ANSIBLE_IPTABLES_DNS_TIME_CLIENT_SOURCES="[172.16.0.0/16]"
+ANSIBLE_IPTABLES_DNS_TIME_CLIENT_SOURCES="[]"
 ANSIBLE_IPTABLES_DNS_PORT=53
 ANSIBLE_IPTABLES_TIME_PORT=123
 ANSIBLE_IPTABLES_BLOCK_ENABLED=false
@@ -55,6 +57,10 @@ ANSIBLE_IPTABLES_BLOCK_CHAINS="[INPUT, OUTPUT]"
 
 `ANSIBLE_IPTABLES_SSH_WHITELIST_IPS` is a comma-separated list of IPv4
 addresses or CIDRs.
+
+`ANSIBLE_IPTABLES_RESET_ENABLED=true` makes the role set `INPUT` and `OUTPUT`
+policy to `ACCEPT`, flush old rules from `ANSIBLE_IPTABLES_RESET_CHAINS`, then
+apply the new rules.
 
 `ANSIBLE_IPTABLES_SERVICE_ALLOWED_SOURCE_IPS` is a YAML list of IPv4 addresses
 or CIDRs that may connect to services on the target hosts.
@@ -67,6 +73,11 @@ default). The role writes these as `INPUT` and `OUTPUT` rules, not Docker
 `ANSIBLE_IPTABLES_IP_PORT_RULES` is a YAML list of per-IP allow rules. Each item
 supports `ip`, `ports`, and optional `protocol` (`tcp` by default). Entries with
 `ports: []` are skipped.
+
+The role checks each rule with `iptables -C` before inserting it with
+`iptables -I`, so allow rules stay before Docker-managed DROP rules.
+It finishes by reinserting priority rules so loopback stays first, followed by
+DNS/time rules, then SSH rules.
 
 `ANSIBLE_IPTABLES_ZABBIX_SERVER_IPS` is a YAML list of Zabbix server IPv4
 addresses or CIDRs. The role opens passive agent polling on
@@ -86,6 +97,12 @@ Add allow rules first:
 ```bash
 cd Ansible
 ./scripts/run-ansible.sh deploy --tags iptables
+```
+
+The singular alias also works:
+
+```bash
+./scripts/run-ansible.sh deploy --tags iptable
 ```
 
 Then block `INPUT` and `OUTPUT` separately:

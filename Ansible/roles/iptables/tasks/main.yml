@@ -11,6 +11,42 @@
   tags:
     - iptables
 
+- name: Validate iptables reset chains
+  ansible.builtin.assert:
+    that:
+      - iptables_reset_chains is sequence
+      - item in ['INPUT', 'OUTPUT']
+    fail_msg: "iptables_reset_chains only supports INPUT and OUTPUT: {{ item }}"
+  loop: "{{ iptables_reset_chains }}"
+  when: iptables_reset_enabled | bool
+  tags:
+    - iptables
+
+- name: Allow iptables INPUT and OUTPUT policies before reset
+  ansible.builtin.command:
+    argv:
+      - iptables
+      - -P
+      - "{{ item }}"
+      - ACCEPT
+  changed_when: true
+  loop: "{{ iptables_reset_chains | unique }}"
+  when: iptables_reset_enabled | bool
+  tags:
+    - iptables
+
+- name: Clear old iptables INPUT and OUTPUT rules before applying new rules
+  ansible.builtin.command:
+    argv:
+      - iptables
+      - -F
+      - "{{ item }}"
+  changed_when: true
+  loop: "{{ iptables_reset_chains | unique }}"
+  when: iptables_reset_enabled | bool
+  tags:
+    - iptables
+
 - name: Validate common iptables inputs
   ansible.builtin.assert:
     that:
@@ -154,6 +190,19 @@
 
 - name: Build common iptables base rules
   ansible.builtin.set_fact:
+    iptables_loopback_rules:
+      - chain: INPUT
+        args:
+          - -i
+          - lo
+          - -j
+          - ACCEPT
+      - chain: OUTPUT
+        args:
+          - -o
+          - lo
+          - -j
+          - ACCEPT
     iptables_base_rules:
       - chain: INPUT
         args:
@@ -437,6 +486,62 @@
   tags:
     - iptables
 
+- name: Initialize iptables SSH priority rules
+  ansible.builtin.set_fact:
+    iptables_ssh_priority_rules: []
+  tags:
+    - iptables
+
+- name: Add iptables SSH priority rules
+  ansible.builtin.set_fact:
+    iptables_ssh_priority_rules: >-
+      {{
+        iptables_ssh_priority_rules
+        + [
+          {
+            'chain': 'INPUT',
+            'args': [
+              '-s', item,
+              '-p', 'tcp',
+              '--dport', iptables_ssh_port | string,
+              '-m', 'conntrack',
+              '--ctstate', 'NEW,ESTABLISHED',
+              '-j', 'ACCEPT'
+            ]
+          },
+          {
+            'chain': 'OUTPUT',
+            'args': [
+              '-d', item,
+              '-p', 'tcp',
+              '--sport', iptables_ssh_port | string,
+              '-m', 'conntrack',
+              '--ctstate', 'ESTABLISHED',
+              '-j', 'ACCEPT'
+            ]
+          }
+        ]
+      }}
+  loop: "{{ iptables_ssh_whitelist_ips }}"
+  tags:
+    - iptables
+
+- name: Build priority iptables rules for final ordering
+  ansible.builtin.set_fact:
+    iptables_priority_rules: "{{ iptables_loopback_rules + iptables_dns_time_rules + iptables_ssh_priority_rules }}"
+  tags:
+    - iptables
+
+- name: Remove existing iptables per-IP port allow rules before reinserting
+  ansible.builtin.command:
+    argv: "{{ ['iptables', '-D', item.chain] + item.args }}"
+  register: iptables_ip_port_allow_rule_delete
+  changed_when: iptables_ip_port_allow_rule_delete.rc == 0
+  failed_when: false
+  loop: "{{ iptables_ip_port_allow_rules }}"
+  tags:
+    - iptables
+
 - name: Check iptables per-IP port allow rules
   ansible.builtin.command:
     argv: "{{ ['iptables', '-C', item.chain] + item.args }}"
@@ -449,10 +554,20 @@
 
 - name: Allow iptables per-IP port traffic
   ansible.builtin.command:
-    argv: "{{ ['iptables', '-A', item.item.chain] + item.item.args }}"
+    argv: "{{ ['iptables', '-I', item.item.chain] + item.item.args }}"
   changed_when: true
   loop: "{{ iptables_ip_port_allow_rule_check.results }}"
   when: item.rc != 0
+  tags:
+    - iptables
+
+- name: Remove existing iptables DNS/time traffic rules before reinserting
+  ansible.builtin.command:
+    argv: "{{ ['iptables', '-D', item.chain] + item.args }}"
+  register: iptables_dns_time_rule_delete
+  changed_when: iptables_dns_time_rule_delete.rc == 0
+  failed_when: false
+  loop: "{{ iptables_dns_time_rules }}"
   tags:
     - iptables
 
@@ -468,10 +583,20 @@
 
 - name: Allow iptables DNS/time traffic
   ansible.builtin.command:
-    argv: "{{ ['iptables', '-A', item.item.chain] + item.item.args }}"
+    argv: "{{ ['iptables', '-I', item.item.chain] + item.item.args }}"
   changed_when: true
   loop: "{{ iptables_dns_time_rule_check.results }}"
   when: item.rc != 0
+  tags:
+    - iptables
+
+- name: Remove existing iptables Zabbix traffic rules before reinserting
+  ansible.builtin.command:
+    argv: "{{ ['iptables', '-D', item.chain] + item.args }}"
+  register: iptables_zabbix_rule_delete
+  changed_when: iptables_zabbix_rule_delete.rc == 0
+  failed_when: false
+  loop: "{{ iptables_zabbix_rules }}"
   tags:
     - iptables
 
@@ -487,10 +612,20 @@
 
 - name: Allow iptables Zabbix traffic
   ansible.builtin.command:
-    argv: "{{ ['iptables', '-A', item.item.chain] + item.item.args }}"
+    argv: "{{ ['iptables', '-I', item.item.chain] + item.item.args }}"
   changed_when: true
   loop: "{{ iptables_zabbix_rule_check.results }}"
   when: item.rc != 0
+  tags:
+    - iptables
+
+- name: Remove existing iptables service traffic rules before reinserting
+  ansible.builtin.command:
+    argv: "{{ ['iptables', '-D', item.chain] + item.args }}"
+  register: iptables_service_rule_delete
+  changed_when: iptables_service_rule_delete.rc == 0
+  failed_when: false
+  loop: "{{ iptables_service_rules }}"
   tags:
     - iptables
 
@@ -506,10 +641,20 @@
 
 - name: Allow iptables service traffic
   ansible.builtin.command:
-    argv: "{{ ['iptables', '-A', item.item.chain] + item.item.args }}"
+    argv: "{{ ['iptables', '-I', item.item.chain] + item.item.args }}"
   changed_when: true
   loop: "{{ iptables_service_rule_check.results }}"
   when: item.rc != 0
+  tags:
+    - iptables
+
+- name: Remove existing common iptables base rules before reinserting
+  ansible.builtin.command:
+    argv: "{{ ['iptables', '-D', item.chain] + item.args }}"
+  register: iptables_base_rule_delete
+  changed_when: iptables_base_rule_delete.rc == 0
+  failed_when: false
+  loop: "{{ iptables_base_rules }}"
   tags:
     - iptables
 
@@ -525,10 +670,35 @@
 
 - name: Allow common iptables base traffic
   ansible.builtin.command:
-    argv: "{{ ['iptables', '-A', item.item.chain] + item.item.args }}"
+    argv: "{{ ['iptables', '-I', item.item.chain] + item.item.args }}"
   changed_when: true
   loop: "{{ iptables_base_rule_check.results }}"
   when: item.rc != 0
+  tags:
+    - iptables
+
+- name: Remove existing iptables SSH input whitelist rules before reinserting
+  ansible.builtin.command:
+    argv:
+      - iptables
+      - -D
+      - INPUT
+      - -s
+      - "{{ item }}"
+      - -p
+      - tcp
+      - --dport
+      - "{{ iptables_ssh_port | string }}"
+      - -m
+      - conntrack
+      - --ctstate
+      - NEW,ESTABLISHED
+      - -j
+      - ACCEPT
+  register: iptables_ssh_input_rule_delete
+  changed_when: iptables_ssh_input_rule_delete.rc == 0
+  failed_when: false
+  loop: "{{ iptables_ssh_whitelist_ips }}"
   tags:
     - iptables
 
@@ -561,7 +731,7 @@
   ansible.builtin.command:
     argv:
       - iptables
-      - -A
+      - -I
       - INPUT
       - -s
       - "{{ item.item }}"
@@ -578,6 +748,31 @@
   changed_when: true
   loop: "{{ iptables_ssh_input_rule_check.results }}"
   when: item.rc != 0
+  tags:
+    - iptables
+
+- name: Remove existing iptables SSH output whitelist rules before reinserting
+  ansible.builtin.command:
+    argv:
+      - iptables
+      - -D
+      - OUTPUT
+      - -d
+      - "{{ item }}"
+      - -p
+      - tcp
+      - --sport
+      - "{{ iptables_ssh_port | string }}"
+      - -m
+      - conntrack
+      - --ctstate
+      - ESTABLISHED
+      - -j
+      - ACCEPT
+  register: iptables_ssh_output_rule_delete
+  changed_when: iptables_ssh_output_rule_delete.rc == 0
+  failed_when: false
+  loop: "{{ iptables_ssh_whitelist_ips }}"
   tags:
     - iptables
 
@@ -610,7 +805,7 @@
   ansible.builtin.command:
     argv:
       - iptables
-      - -A
+      - -I
       - OUTPUT
       - -d
       - "{{ item.item }}"
@@ -627,5 +822,22 @@
   changed_when: true
   loop: "{{ iptables_ssh_output_rule_check.results }}"
   when: item.rc != 0
+  tags:
+    - iptables
+
+- name: Remove priority iptables rules before final ordering
+  ansible.builtin.command:
+    argv: "{{ ['iptables', '-D', item.chain] + item.args }}"
+  changed_when: false
+  failed_when: false
+  loop: "{{ iptables_priority_rules }}"
+  tags:
+    - iptables
+
+- name: Reinsert priority iptables rules in fixed order
+  ansible.builtin.command:
+    argv: "{{ ['iptables', '-I', item.chain] + item.args }}"
+  changed_when: true
+  loop: "{{ iptables_priority_rules | reverse | list }}"
   tags:
     - iptables

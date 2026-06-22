@@ -8,6 +8,7 @@
     fail_msg: "iptables_block_chains only supports INPUT and OUTPUT: {{ item }}"
   loop: "{{ iptables_block_chains }}"
   tags:
+    - iptable_block
     - iptables_block
 
 - name: Check iptables chain policies before block
@@ -20,6 +21,7 @@
   changed_when: false
   loop: "{{ iptables_block_chains | unique }}"
   tags:
+    - iptable_block
     - iptables_block
 
 - name: Block iptables INPUT and OUTPUT chains
@@ -33,4 +35,5 @@
   loop: "{{ iptables_block_policy_check.results }}"
   when: ("-P " ~ item.item ~ " DROP") not in item.stdout_lines
   tags:
+    - iptable_block
     - iptables_block

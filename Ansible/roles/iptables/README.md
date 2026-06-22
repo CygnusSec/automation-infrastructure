@@ -9,6 +9,8 @@ Set values in `env.d/20-base.env`:
 ```env
 ANSIBLE_IPTABLES_ENABLED=true
 ANSIBLE_IPTABLES_TARGET_GROUP=iptables_targets
+ANSIBLE_IPTABLES_RESET_ENABLED=true
+ANSIBLE_IPTABLES_RESET_CHAINS="[INPUT, OUTPUT]"
 ANSIBLE_IPTABLES_SSH_WHITELIST_IPS="172.16.3.21,172.16.3.22"
 ANSIBLE_IPTABLES_SSH_PORT=22
 ANSIBLE_IPTABLES_SERVICE_ALLOWED_SOURCE_IPS="[172.16.3.97, 172.16.3.98]"
@@ -18,7 +20,7 @@ ANSIBLE_IPTABLES_ZABBIX_SERVER_IPS="[172.16.5.57]"
 ANSIBLE_IPTABLES_ZABBIX_AGENT_PORT=10050
 ANSIBLE_IPTABLES_ZABBIX_SERVER_PORT=10051
 ANSIBLE_IPTABLES_DNS_TIME_SERVER_IPS="[172.16.3.200, 172.16.3.201]"
-ANSIBLE_IPTABLES_DNS_TIME_CLIENT_SOURCES="[172.16.0.0/16]"
+ANSIBLE_IPTABLES_DNS_TIME_CLIENT_SOURCES="[]"
 ANSIBLE_IPTABLES_DNS_PORT=53
 ANSIBLE_IPTABLES_TIME_PORT=123
 ANSIBLE_IPTABLES_BLOCK_ENABLED=false
@@ -37,6 +39,12 @@ Run only this role:
 ./scripts/run-ansible.sh deploy --tags iptables
 ```
 
+The singular alias also works:
+
+```bash
+./scripts/run-ansible.sh deploy --tags iptable
+```
+
 Block `INPUT` and `OUTPUT` as a separate task after allow rules are in place:
 
 ```bash
@@ -47,7 +55,15 @@ Set `ANSIBLE_IPTABLES_BLOCK_ENABLED=true` in `env.d/20-base.env` before running
 the block task. The runner loads `env.d/20-base.env` for this tag.
 
 The role checks each rule with `iptables -C` before adding it with
-`iptables -A`, so reruns do not duplicate rules.
+`iptables -I`, so reruns do not duplicate rules and allow rules stay before
+Docker-managed DROP rules.
+
+At the end of the run, the role reinserts priority rules so loopback stays
+first, followed by DNS/time rules, then SSH rules.
+
+By default the role first sets `INPUT` and `OUTPUT` policy to `ACCEPT`, flushes
+old rules from those chains, then applies the configured rules. Set
+`ANSIBLE_IPTABLES_RESET_ENABLED=false` if you need additive behavior.
 
 Service rules are added to `INPUT` and `OUTPUT` only. Docker Swarm peer rules
 remain in the separate `docker_swarm_iptables` task.

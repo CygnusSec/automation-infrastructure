@@ -143,6 +143,17 @@
     - docker_swarm
     - docker_swarm_iptables
 
+- name: Remove existing Docker Swarm iptables rules before reinserting
+  ansible.builtin.command:
+    argv: "{{ ['iptables', '-D', item.chain] + item.args }}"
+  register: docker_swarm_iptables_delete
+  changed_when: docker_swarm_iptables_delete.rc == 0
+  failed_when: false
+  loop: "{{ docker_swarm_iptables_rules }}"
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+
 - name: Check Docker Swarm iptables rules
   ansible.builtin.command:
     argv: "{{ ['iptables', '-C', item.chain] + item.args }}"
@@ -156,7 +167,7 @@
 
 - name: Allow Docker Swarm iptables traffic
   ansible.builtin.command:
-    argv: "{{ ['iptables', '-A', item.item.chain] + item.item.args }}"
+    argv: "{{ ['iptables', '-I', item.item.chain] + item.item.args }}"
   changed_when: true
   loop: "{{ docker_swarm_iptables_check.results }}"
   when: item.rc != 0

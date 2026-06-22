@@ -54,6 +54,7 @@
     - role: iptables
       when: iptables_enabled | bool
   tags:
+    - iptable
     - iptables
 
 - name: Block common iptables INPUT and OUTPUT
@@ -67,8 +68,10 @@
         tasks_from: block
       when: iptables_block_enabled | bool
       tags:
+        - iptable_block
         - iptables_block
   tags:
+    - iptable_block
     - iptables_block
 
 - name: Install Zabbix server
