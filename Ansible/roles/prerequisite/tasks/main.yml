@@ -127,10 +127,27 @@
   tags:
     - prerequisite
 
-- name: Install prerequisite packages from local deb repository
-  ansible.builtin.shell: apt-get install -y "{{ prerequisite_repo_dest }}"/*.deb
+- name: Preseed persistent firewall package prompts
+  ansible.builtin.shell: |
+    set -euo pipefail
+    debconf-set-selections <<'EOF'
+    iptables-persistent iptables-persistent/autosave_v4 boolean true
+    iptables-persistent iptables-persistent/autosave_v6 boolean true
+    ipset-persistent ipset-persistent/autosave boolean true
+    EOF
   args:
     executable: /bin/bash
+  changed_when: false
+  when: prerequisite_install_from_local_repo | bool
+  tags:
+    - prerequisite
+
+- name: Install prerequisite packages from local deb repository
+  ansible.builtin.shell: dpkg -i "{{ prerequisite_repo_dest }}"/*.deb
+  args:
+    executable: /bin/bash
+  environment:
+    DEBIAN_FRONTEND: noninteractive
   when: prerequisite_install_from_local_repo | bool
   tags:
     - prerequisite

@@ -37,7 +37,7 @@ load_ansible_env() {
   env_file_for_tag() {
     local tag="$1"
     case "${tag}" in
-      base|prerequisite|docker|iptable|iptables|iptables_primary|iptables_zabbix|iptables_ipsets|iptables_save|iptable_block|iptables_block|mariadb_remove)
+      base|prerequisite|docker|installation_cleanup|iptable|iptables|iptables_primary|iptables_zabbix|iptables_ipsets|iptables_save|iptable_block|iptables_block|mariadb_remove|openresty_remove|apache2_remove)
         printf '%s\n' "20-base.env"
         ;;
       hostname|network)

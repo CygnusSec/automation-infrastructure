@@ -20,6 +20,7 @@ ANSIBLE_TARGET_DISTRIBUTION=Ubuntu
 ANSIBLE_PREREQUISITE_DISABLE_SWAP=true
 ANSIBLE_PREREQUISITE_DISABLE_UFW=false
 ANSIBLE_PREREQUISITE_TIMEZONE=
+ANSIBLE_PREREQUISITE_TARGET_GROUP=all_targets
 ANSIBLE_PREREQUISITE_INSTALL_FROM_LOCAL_REPO=true
 ANSIBLE_PREREQUISITE_REPO_SOURCE=./repo/prerequisite
 ANSIBLE_PREREQUISITE_REPO_DEST=/media/installation/prerequisite
@@ -32,6 +33,15 @@ cd Ansible
 ./scripts/run-ansible.sh deploy --tags prerequisite
 ```
 
+Run one host by IP:
+
+```bash
+./scripts/run-ansible.sh deploy --tags prerequisite --limit 172.16.3.28
+```
+
+The wrapper translates the IP to the generated inventory alias, while the play
+targets `ANSIBLE_PREREQUISITE_TARGET_GROUP` (`all_targets` by default).
+
 ## Offline Notes
 
 When `ANSIBLE_PREREQUISITE_INSTALL_FROM_LOCAL_REPO=true`, put required `.deb`
@@ -42,7 +52,10 @@ Ansible/repo/prerequisite/
 ```
 
 The role copies them to `ANSIBLE_PREREQUISITE_REPO_DEST` on the target and runs
-`apt-get install` from that directory.
+`dpkg -i` for every `.deb` in that directory. This avoids apt solver conflicts
+when an offline target already has partially upgraded package pairs. The role
+also preseeds `iptables-persistent` and `ipset-persistent` prompts and runs
+package install with `DEBIAN_FRONTEND=noninteractive`.
 
 `scripts/build-offline-bundle.sh` can download prerequisite `.deb` packages
 into `Ansible/repo/prerequisite/` before packaging the bundle. Configure these

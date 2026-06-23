@@ -67,7 +67,7 @@ def connection_vars(become):
 def build_inventory():
     inventory = {
         "_meta": {"hostvars": {}},
-        "all": {"children": ["all_targets", "ssh_copy_id_targets", "linux", "iptables_targets", "package_update_targets", "zabbix_server_targets", "zabbix_agent_targets", "dns_time_servers", "external_disk_targets", "tldh_database_targets"]},
+        "all": {"children": ["all_targets", "ssh_copy_id_targets", "linux", "iptables_targets", "package_update_targets", "openresty_remove_targets", "apache2_remove_targets", "zabbix_server_targets", "zabbix_agent_targets", "dns_time_servers", "external_disk_targets", "tldh_database_targets"]},
     }
 
     manager_hosts = csv_env("ANSIBLE_SWARM_MANAGER_HOSTS", os.environ.get("ANSIBLE_MANAGER_1_HOST", ""))
@@ -82,6 +82,8 @@ def build_inventory():
     ssh_extra_hosts = csv_env("ANSIBLE_SSH_COPY_ID_EXTRA_HOSTS")
     iptables_hosts = csv_env("ANSIBLE_IPTABLES_HOSTS")
     package_update_hosts = csv_env("ANSIBLE_PACKAGE_UPDATE_HOSTS")
+    openresty_remove_hosts = csv_env("ANSIBLE_OPENRESTY_REMOVE_HOSTS")
+    apache2_remove_hosts = csv_env("ANSIBLE_APACHE2_REMOVE_HOSTS")
     zabbix_server_hosts = csv_env("ANSIBLE_ZABBIX_SERVER_HOSTS")
     zabbix_hosts = csv_env("ANSIBLE_ZABBIX_AGENT_HOSTS")
     dns_time_hosts = csv_env("ANSIBLE_DNS_TIME_SERVER_HOSTS")
@@ -216,6 +218,14 @@ def build_inventory():
         alias = ip_to_alias.get(ip, host_alias("package-update", ip))
         add_host(inventory, "package_update_targets", alias, ip, advertise=False)
 
+    for ip in openresty_remove_hosts:
+        alias = ip_to_alias.get(ip, host_alias("openresty-remove", ip))
+        add_host(inventory, "openresty_remove_targets", alias, ip, advertise=False)
+
+    for ip in apache2_remove_hosts:
+        alias = ip_to_alias.get(ip, host_alias("apache2-remove", ip))
+        add_host(inventory, "apache2_remove_targets", alias, ip, advertise=False)
+
     for ip in zabbix_server_hosts:
         alias = ip_to_alias.get(ip, host_alias("zabbix-server", ip))
         add_host(inventory, "zabbix_server_targets", alias, ip, advertise=False)
@@ -228,6 +238,8 @@ def build_inventory():
     set_group_vars(inventory, "all_targets", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
     set_group_vars(inventory, "iptables_targets", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
     set_group_vars(inventory, "package_update_targets", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
+    set_group_vars(inventory, "openresty_remove_targets", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
+    set_group_vars(inventory, "apache2_remove_targets", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
     set_group_vars(inventory, "zabbix_server_targets", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
     set_group_vars(inventory, "zabbix_agent_targets", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))
     set_group_vars(inventory, "dns_time_servers", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))

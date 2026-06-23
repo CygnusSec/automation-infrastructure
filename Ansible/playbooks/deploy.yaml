@@ -1,20 +1,31 @@
 ---
 - name: Prepare base Ubuntu hosts
-  hosts: linux
+  hosts: "{{ lookup('env', 'ANSIBLE_PREREQUISITE_TARGET_GROUP') | default('all_targets', true) }}"
   gather_facts: false
   become: true
   pre_tasks:
     - name: Gather facts
       ansible.builtin.setup:
       tags:
-        - base
         - prerequisite
-        - docker
   roles:
     - prerequisite
+  tags:
+    - prerequisite
+
+- name: Install Docker runtime
+  hosts: "{{ lookup('env', 'ANSIBLE_DOCKER_TARGET_GROUP') | default('linux', true) }}"
+  gather_facts: false
+  become: true
+  pre_tasks:
+    - name: Gather facts
+      ansible.builtin.setup:
+      tags:
+        - docker
+  roles:
     - docker
   tags:
-    - base
+    - docker
 
 - name: Manage hostnames
   hosts: linux
@@ -86,6 +97,56 @@
       when: package_update_enabled | bool
   tags:
     - package_update
+
+- name: Clean installation staging directory
+  hosts: "{{ lookup('env', 'ANSIBLE_INSTALLATION_CLEANUP_TARGET_GROUP') | default('all_targets', true) }}"
+  gather_facts: false
+  become: true
+  vars:
+    installation_cleanup_dir: "{{ lookup('env', 'ANSIBLE_INSTALLATION_CLEANUP_DIR') | default('/media/installation', true) }}"
+  tasks:
+    - name: Validate installation cleanup directory
+      ansible.builtin.assert:
+        that:
+          - installation_cleanup_dir == '/media/installation'
+        fail_msg: "Refusing to clean unexpected directory: {{ installation_cleanup_dir }}"
+      tags:
+        - never
+        - installation_cleanup
+
+    - name: Find installation staging directory contents
+      ansible.builtin.find:
+        paths: "{{ installation_cleanup_dir }}"
+        file_type: any
+        hidden: true
+        recurse: false
+      register: installation_cleanup_items
+      tags:
+        - never
+        - installation_cleanup
+
+    - name: Clean installation staging directory contents
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ installation_cleanup_items.files | default([]) }}"
+      tags:
+        - never
+        - installation_cleanup
+
+    - name: Ensure installation staging directory exists
+      ansible.builtin.file:
+        path: "{{ installation_cleanup_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      tags:
+        - never
+        - installation_cleanup
+  tags:
+    - never
+    - installation_cleanup
 
 - name: Install Zabbix server
   hosts: "{{ lookup('env', 'ANSIBLE_ZABBIX_SERVER_TARGET_GROUP') | default('zabbix_server_targets', true) }}"
@@ -163,6 +224,72 @@
         - mariadb_remove
   tags:
     - mariadb_remove
+
+- name: Remove native OpenResty package
+  hosts: "{{ lookup('env', 'ANSIBLE_OPENRESTY_REMOVE_TARGET_GROUP') | default('openresty_remove_targets', true) }}"
+  gather_facts: false
+  become: true
+  vars:
+    openresty_remove_packages: "{{ lookup('env', 'ANSIBLE_OPENRESTY_REMOVE_PACKAGES') | default('[openresty]', true) | from_yaml }}"
+    openresty_remove_services: "{{ lookup('env', 'ANSIBLE_OPENRESTY_REMOVE_SERVICES') | default('[openresty]', true) | from_yaml }}"
+    openresty_remove_purge: "{{ (lookup('env', 'ANSIBLE_OPENRESTY_REMOVE_PURGE') | default('false', true)) | bool }}"
+    openresty_remove_autoremove: "{{ (lookup('env', 'ANSIBLE_OPENRESTY_REMOVE_AUTOREMOVE') | default('true', true)) | bool }}"
+  tasks:
+    - name: Stop OpenResty services before package removal
+      become: true
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+      loop: "{{ openresty_remove_services }}"
+      failed_when: false
+      tags:
+        - openresty_remove
+
+    - name: Remove OpenResty packages
+      become: true
+      ansible.builtin.apt:
+        name: "{{ openresty_remove_packages }}"
+        state: absent
+        purge: "{{ openresty_remove_purge }}"
+        autoremove: "{{ openresty_remove_autoremove }}"
+      tags:
+        - openresty_remove
+  tags:
+    - openresty_remove
+
+- name: Remove native Apache2 packages
+  hosts: "{{ lookup('env', 'ANSIBLE_APACHE2_REMOVE_TARGET_GROUP') | default('all_targets', true) }}"
+  gather_facts: false
+  become: true
+  vars:
+    apache2_remove_packages: "{{ lookup('env', 'ANSIBLE_APACHE2_REMOVE_PACKAGES') | default('[apache2, apache2-bin, apache2-data, apache2-utils]', true) | from_yaml }}"
+    apache2_remove_services: "{{ lookup('env', 'ANSIBLE_APACHE2_REMOVE_SERVICES') | default('[apache2]', true) | from_yaml }}"
+    apache2_remove_purge: "{{ (lookup('env', 'ANSIBLE_APACHE2_REMOVE_PURGE') | default('false', true)) | bool }}"
+    apache2_remove_autoremove: "{{ (lookup('env', 'ANSIBLE_APACHE2_REMOVE_AUTOREMOVE') | default('true', true)) | bool }}"
+  tasks:
+    - name: Stop Apache2 services before package removal
+      become: true
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+      loop: "{{ apache2_remove_services }}"
+      failed_when: false
+      tags:
+        - apache2_remove
+
+    - name: Remove Apache2 packages
+      become: true
+      ansible.builtin.apt:
+        name: "{{ apache2_remove_packages }}"
+        state: absent
+        purge: "{{ apache2_remove_purge }}"
+        autoremove: "{{ apache2_remove_autoremove }}"
+      tags:
+        - apache2_remove
+  tags:
+    - apache2_remove
 
 - name: Configure Dockerized DNS and time servers
   hosts: "{{ lookup('env', 'ANSIBLE_DNS_TIME_SERVICES_TARGET_GROUP') | default('dns_time_servers', true) }}"

@@ -19,6 +19,10 @@ docker_packages:
   - docker-compose-v2
 ```
 
+The deploy play targets `ANSIBLE_DOCKER_TARGET_GROUP`, default `linux`, so Docker
+installation stays scoped to swarm/Linux runtime hosts instead of every
+`all_targets` host.
+
 After adding local `.deb` files, switch to local installation:
 
 ```yaml

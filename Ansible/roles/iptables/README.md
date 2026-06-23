@@ -20,7 +20,7 @@ ANSIBLE_IPTABLES_IPSET_PREFIX=common
 ANSIBLE_IPTABLES_SSH_WHITELIST_IPS="172.16.3.21,172.16.3.22"
 ANSIBLE_IPTABLES_SSH_PORT=22
 ANSIBLE_IPTABLES_SERVICE_ALLOWED_SOURCE_IPS="[]"
-ANSIBLE_IPTABLES_EXTERNAL_SERVICE_RULES="[]"
+ANSIBLE_IPTABLES_EXTERNAL_SERVICE_RULES="[{name: postgres_out, ips: [172.16.4.15, 172.16.4.16], source_ips: [172.16.3.28, 172.16.3.38], ports: [5432]}]"
 ANSIBLE_IPTABLES_INBOUND_SERVICE_RULES="[{name: database_in, target_ips: [172.16.4.11, 172.16.4.12], source_ips: [172.16.3.21, 172.16.3.22], ports: [3306]}]"
 ANSIBLE_IPTABLES_IP_PORT_RULES="[{ip: 172.16.5.100, ports: [80, 443]}, {ip: 172.16.5.102, ports: [8080]}, {ip: 172.16.5.103, ports: []}]"
 ANSIBLE_IPTABLES_ZABBIX_SERVER_IPS="[172.16.5.57]"
@@ -121,9 +121,10 @@ ports. Set this variable to a YAML list of source IPs/CIDRs to restrict access.
 adds the matching response `OUTPUT` rules.
 
 `ANSIBLE_IPTABLES_EXTERNAL_SERVICE_RULES` is client-side on hosts outside the
-service IP list. If the current host IP is listed in a rule's `ips`, that host
-is treated as the service server and gets `INPUT --dport` plus `OUTPUT --sport`
-rules for the configured ports.
+service IP list. Set optional `source_ips` to limit which client hosts get
+`OUTPUT --dport` rules. If the current host IP is listed in a rule's `ips`,
+that host is treated as the service server and gets `INPUT --dport` plus
+`OUTPUT --sport` rules for the configured ports.
 
 When `ANSIBLE_IPTABLES_MANAGE_IPSETS=true`, the role creates common ipsets for
 SSH sources, DNS/time servers, Zabbix servers/agents, and configured service
