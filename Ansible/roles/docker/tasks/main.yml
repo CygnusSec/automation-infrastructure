@@ -25,10 +25,71 @@
   tags:
     - docker
 
+- name: Resolve Docker local deb repository source on control
+  ansible.builtin.set_fact:
+    docker_repo_source_resolved: >-
+      {{
+        docker_repo_source
+        if docker_repo_source.startswith('/')
+        else playbook_dir ~ '/../' ~ docker_repo_source
+      }}
+  when: docker_install_from_local_repo | bool
+  tags:
+    - docker
+
+- name: Check Docker local deb repository source
+  ansible.builtin.stat:
+    path: "{{ docker_repo_source_resolved }}"
+  register: docker_repo_source_stat
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when: docker_install_from_local_repo | bool
+  tags:
+    - docker
+
+- name: Validate Docker local deb repository source
+  ansible.builtin.assert:
+    that:
+      - docker_repo_source_stat.stat.exists
+      - docker_repo_source_stat.stat.isdir
+    fail_msg: >-
+      Docker local repo source not found on the Ansible controller:
+      {{ docker_repo_source_resolved }}. Build/copy the offline bundle with
+      repo/docker included before running docker.
+  when: docker_install_from_local_repo | bool
+  tags:
+    - docker
+
+- name: Find Docker local deb repository source packages
+  ansible.builtin.find:
+    paths: "{{ docker_repo_source_resolved }}"
+    patterns: "*.deb"
+    file_type: file
+  register: docker_repo_source_debs
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when: docker_install_from_local_repo | bool
+  tags:
+    - docker
+
+- name: Validate Docker local deb repository source packages
+  ansible.builtin.assert:
+    that:
+      - docker_repo_source_debs.matched | int > 0
+    fail_msg: >-
+      No .deb files found in Docker local repo source on the Ansible
+      controller: {{ docker_repo_source_resolved }}. Populate repo/docker before
+      deploying offline.
+  when: docker_install_from_local_repo | bool
+  tags:
+    - docker
+
 - name: Copy Docker local deb repository
   become: true
   ansible.builtin.copy:
-    src: "{{ docker_repo_source }}/"
+    src: "{{ docker_repo_source_resolved }}/"
     dest: "{{ docker_repo_dest }}/"
     owner: root
     group: root

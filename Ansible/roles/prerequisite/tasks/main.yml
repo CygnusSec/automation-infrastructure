@@ -35,9 +35,71 @@
   tags:
     - prerequisite
 
+- name: Resolve prerequisite local deb repository source on control
+  ansible.builtin.set_fact:
+    prerequisite_repo_source_resolved: >-
+      {{
+        prerequisite_repo_source
+        if prerequisite_repo_source.startswith('/')
+        else playbook_dir ~ '/../' ~ prerequisite_repo_source
+      }}
+  when: prerequisite_install_from_local_repo | bool
+  tags:
+    - prerequisite
+
+- name: Check prerequisite local deb repository source
+  ansible.builtin.stat:
+    path: "{{ prerequisite_repo_source_resolved }}"
+  register: prerequisite_repo_source_stat
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when: prerequisite_install_from_local_repo | bool
+  tags:
+    - prerequisite
+
+- name: Validate prerequisite local deb repository source
+  ansible.builtin.assert:
+    that:
+      - prerequisite_repo_source_stat.stat.exists
+      - prerequisite_repo_source_stat.stat.isdir
+    fail_msg: >-
+      Prerequisite local repo source not found on the Ansible controller:
+      {{ prerequisite_repo_source_resolved }}. Build/copy the offline bundle
+      with repo/prerequisite included before running prerequisite.
+  when: prerequisite_install_from_local_repo | bool
+  tags:
+    - prerequisite
+
+- name: Find prerequisite local deb repository source packages
+  ansible.builtin.find:
+    paths: "{{ prerequisite_repo_source_resolved }}"
+    patterns: "*.deb"
+    file_type: file
+  register: prerequisite_repo_source_debs
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when: prerequisite_install_from_local_repo | bool
+  tags:
+    - prerequisite
+
+- name: Validate prerequisite local deb repository source packages
+  ansible.builtin.assert:
+    that:
+      - prerequisite_repo_source_debs.matched | int > 0
+    fail_msg: >-
+      No .deb files found in prerequisite local repo source on the Ansible
+      controller: {{ prerequisite_repo_source_resolved }}. Run
+      ./scripts/build-offline-bundle.sh on the online build machine so
+      repo/prerequisite is populated before deploying offline.
+  when: prerequisite_install_from_local_repo | bool
+  tags:
+    - prerequisite
+
 - name: Copy prerequisite local deb repository
   ansible.builtin.copy:
-    src: "{{ prerequisite_repo_source }}/"
+    src: "{{ prerequisite_repo_source_resolved }}/"
     dest: "{{ prerequisite_repo_dest }}/"
     owner: root
     group: root
@@ -60,7 +122,7 @@
   ansible.builtin.assert:
     that:
       - prerequisite_local_debs.matched | int > 0
-    fail_msg: "No .deb files found in {{ prerequisite_repo_dest }}. Add Ubuntu 24.04 packages under {{ prerequisite_repo_source }} before running offline."
+    fail_msg: "No .deb files found in {{ prerequisite_repo_dest }}. Add Ubuntu 24.04 packages under {{ prerequisite_repo_source_resolved }} before running offline."
   when: prerequisite_install_from_local_repo | bool
   tags:
     - prerequisite

@@ -55,9 +55,71 @@
   tags:
     - package_update
 
+- name: Resolve package update local deb repository source on control
+  ansible.builtin.set_fact:
+    package_update_repo_source_resolved: >-
+      {{
+        package_update_repo_source
+        if package_update_repo_source.startswith('/')
+        else playbook_dir ~ '/../' ~ package_update_repo_source
+      }}
+  when: package_update_install_from_local_repo | bool
+  tags:
+    - package_update
+
+- name: Check package update local deb repository source
+  ansible.builtin.stat:
+    path: "{{ package_update_repo_source_resolved }}"
+  register: package_update_repo_source_stat
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when: package_update_install_from_local_repo | bool
+  tags:
+    - package_update
+
+- name: Validate package update local deb repository source
+  ansible.builtin.assert:
+    that:
+      - package_update_repo_source_stat.stat.exists
+      - package_update_repo_source_stat.stat.isdir
+    fail_msg: >-
+      Package update local repo source not found on the Ansible controller:
+      {{ package_update_repo_source_resolved }}. Build/copy the offline bundle
+      with repo/update included before running package_update.
+  when: package_update_install_from_local_repo | bool
+  tags:
+    - package_update
+
+- name: Find package update local deb repository source packages
+  ansible.builtin.find:
+    paths: "{{ package_update_repo_source_resolved }}"
+    patterns: "*.deb"
+    file_type: file
+  register: package_update_repo_source_debs
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when: package_update_install_from_local_repo | bool
+  tags:
+    - package_update
+
+- name: Validate package update local deb repository source packages
+  ansible.builtin.assert:
+    that:
+      - package_update_repo_source_debs.matched | int > 0
+    fail_msg: >-
+      No .deb files found in package update local repo source on the Ansible
+      controller: {{ package_update_repo_source_resolved }}. Run
+      ./scripts/build-offline-bundle.sh on the online build machine so
+      repo/update is populated before deploying offline.
+  when: package_update_install_from_local_repo | bool
+  tags:
+    - package_update
+
 - name: Copy package update local deb repository
   ansible.builtin.copy:
-    src: "{{ package_update_repo_source }}/"
+    src: "{{ package_update_repo_source_resolved }}/"
     dest: "{{ package_update_repo_dest }}/"
     owner: root
     group: root

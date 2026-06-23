@@ -22,7 +22,13 @@ This task is run on an online machine to build an offline Ansible bundle.
 RUNTIME_IMAGE=
 LOCAL_RUNTIME_IMAGE=ansible-base-runtime:local
 ANSIBLE_OFFLINE_BUNDLE_INCLUDE_REAL_ENV=true
+ANSIBLE_OFFLINE_BUNDLE_BUILD_ALL=true
 ANSIBLE_DNS_TIME_SERVICES_BUILD_IMAGES=true
+ANSIBLE_DNS_SERVER_BUILD_IMAGE=true
+ANSIBLE_TIME_SERVER_BUILD_IMAGE=true
+ANSIBLE_PREREQUISITE_DOWNLOAD_PACKAGES=true
+ANSIBLE_PREREQUISITE_OFFLINE_PACKAGES="apt-transport-https ca-certificates curl gnupg ipset ipset-persistent iptables-persistent lsb-release net-tools netfilter-persistent openssh-client python3 python3-apt python3-pip rsync sshpass telnet traceroute unzip vim wget libheif1 libheif-plugin-aomenc libheif-plugin-libde265 systemd libsystemd-shared libnss-systemd libpam-systemd systemd-resolved systemd-timesyncd udev libudev1"
+ANSIBLE_PACKAGE_UPDATE_DOWNLOAD_PACKAGES=true
 ANSIBLE_ZABBIX_AGENT_DOWNLOAD_PACKAGES=true
 ANSIBLE_ZABBIX_AGENT_DOWNLOAD_IMAGE=ubuntu:24.04
 ANSIBLE_ZABBIX_AGENT_RELEASE_URL=https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb
@@ -39,6 +45,35 @@ Keep `ANSIBLE_OFFLINE_BUNDLE_INCLUDE_REAL_ENV=true` in
 `env.d/90-offline-bundle.env` when the bundle must include the current real
 `.env` and `env.d/*.env` files with populated values. Set it to `false` only
 when the bundle should be safe to hand off with templates only.
+
+## Build Flags
+
+`ANSIBLE_OFFLINE_BUNDLE_BUILD_ALL=true` enables every downloadable/buildable
+artifact by default.
+
+Set `ANSIBLE_OFFLINE_BUNDLE_BUILD_ALL=false`, then enable only the repo or
+service that must be refreshed:
+
+```env
+ANSIBLE_OFFLINE_BUNDLE_BUILD_ALL=false
+ANSIBLE_PREREQUISITE_DOWNLOAD_PACKAGES=true
+ANSIBLE_PACKAGE_UPDATE_DOWNLOAD_PACKAGES=false
+ANSIBLE_ZABBIX_AGENT_DOWNLOAD_PACKAGES=false
+ANSIBLE_ZABBIX_SERVER_DOWNLOAD_PACKAGES=false
+ANSIBLE_DNS_SERVER_BUILD_IMAGE=false
+ANSIBLE_TIME_SERVER_BUILD_IMAGE=false
+```
+
+Available per-artifact flags:
+
+```text
+ANSIBLE_PREREQUISITE_DOWNLOAD_PACKAGES
+ANSIBLE_PACKAGE_UPDATE_DOWNLOAD_PACKAGES
+ANSIBLE_ZABBIX_AGENT_DOWNLOAD_PACKAGES
+ANSIBLE_ZABBIX_SERVER_DOWNLOAD_PACKAGES
+ANSIBLE_DNS_SERVER_BUILD_IMAGE
+ANSIBLE_TIME_SERVER_BUILD_IMAGE
+```
 
 The Zabbix package downloader runs in `ANSIBLE_ZABBIX_AGENT_DOWNLOAD_IMAGE`.
 Agent packages are written to `repo/zabbix`, while server packages are written
