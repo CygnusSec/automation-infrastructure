@@ -101,7 +101,7 @@ package_update_cleanup_installation_dir: "{{ (lookup('env', 'ANSIBLE_PACKAGE_UPD
 package_update_installation_dir: "{{ lookup('env', 'ANSIBLE_PACKAGE_UPDATE_INSTALLATION_DIR') | default('/media/installation', true) }}"
 package_update_cache_valid_time: "{{ (lookup('env', 'ANSIBLE_PACKAGE_UPDATE_CACHE_VALID_TIME') | default('3600', true)) | int }}"
 package_update_allow_downgrade: "{{ (lookup('env', 'ANSIBLE_PACKAGE_UPDATE_ALLOW_DOWNGRADE') | default('false', true)) | bool }}"
-package_update_packages: "{{ lookup('env', 'ANSIBLE_PACKAGE_UPDATE_PACKAGES') | default('[{name: libssl3t64, version: 3.0.13-0ubuntu3.11}, {name: openssl, version: 3.0.13-0ubuntu3.11}, {name: inetutils-telnet, version: ''2:2.5-3ubuntu4.2''}, {name: telnet, version: 0.17+2.5-3ubuntu4.2}, {name: vim, version: ''2:9.1.0016-1ubuntu7.15''}, {name: vim-common, version: ''2:9.1.0016-1ubuntu7.15''}, {name: vim-runtime, version: ''2:9.1.0016-1ubuntu7.15''}, {name: vim-tiny, version: ''2:9.1.0016-1ubuntu7.15''}, {name: xxd, version: ''2:9.1.0016-1ubuntu7.15''}]', true) | from_yaml }}"
+package_update_packages: "{{ lookup('env', 'ANSIBLE_PACKAGE_UPDATE_PACKAGES') | default('[{name: libssl3t64}, {name: openssl}, {name: inetutils-telnet}, {name: telnet}, {name: vim}, {name: vim-common}, {name: vim-runtime}, {name: vim-tiny}, {name: xxd}]', true) | from_yaml }}"
 
 # SSH bootstrap.
 ssh_copy_id_public_key_file: "{{ lookup('env', 'ANSIBLE_SSH_COPY_ID_PUBLIC_KEY_FILE') | default(ansible_ssh_private_key_file ~ '.pub', true) }}"

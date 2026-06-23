@@ -1,6 +1,7 @@
 # Package Update
 
-Updates selected Ubuntu packages to exact fixed versions.
+Updates selected Ubuntu packages to the latest available versions, or to exact
+fixed versions when a package entry includes `version`.
 
 ## Target Hosts
 
@@ -29,21 +30,21 @@ ANSIBLE_PACKAGE_UPDATE_REPO_SOURCE=./repo/update
 ANSIBLE_PACKAGE_UPDATE_REPO_DEST=/media/installation/update
 ANSIBLE_PACKAGE_UPDATE_CLEANUP_INSTALLATION_DIR=true
 ANSIBLE_PACKAGE_UPDATE_INSTALLATION_DIR=/media/installation
-ANSIBLE_PACKAGE_UPDATE_PACKAGES="[{name: libssl3t64, version: 3.0.13-0ubuntu3.11}, {name: openssl, version: 3.0.13-0ubuntu3.11}]"
+ANSIBLE_PACKAGE_UPDATE_PACKAGES="[{name: libssl3t64}, {name: openssl}, {name: inetutils-telnet}, {name: telnet}, {name: vim}, {name: vim-common}, {name: vim-runtime}, {name: vim-tiny}, {name: xxd}]"
 ```
 
-## Fixed Versions
+## Current Package List
 
 ```text
-libssl3t64       3.0.13-0ubuntu3.11
-openssl          3.0.13-0ubuntu3.11
-inetutils-telnet 2:2.5-3ubuntu4.2
-telnet           0.17+2.5-3ubuntu4.2
-vim              2:9.1.0016-1ubuntu7.15
-vim-common       2:9.1.0016-1ubuntu7.15
-vim-runtime      2:9.1.0016-1ubuntu7.15
-vim-tiny         2:9.1.0016-1ubuntu7.15
-xxd              2:9.1.0016-1ubuntu7.15
+libssl3t64
+openssl
+inetutils-telnet
+telnet
+vim
+vim-common
+vim-runtime
+vim-tiny
+xxd
 ```
 
 ## Command
@@ -55,13 +56,15 @@ cd Ansible
 
 ## Offline Notes
 
-For offline runs, put the fixed `.deb` files in:
+For offline runs, put the `.deb` files in:
 
 ```text
 Ansible/repo/update/
 ```
 
-The offline bundle builder downloads the pinned versions from
+The offline bundle builder downloads the latest available packages from
 `ANSIBLE_PACKAGE_UPDATE_OFFLINE_PACKAGES` in `env.d/90-offline-bundle.env`.
-After package install and version verification, the role clears every item under
-`ANSIBLE_PACKAGE_UPDATE_INSTALLATION_DIR`, default `/media/installation`.
+For each package entry without `version`, the role installs the highest local
+`.deb` version found in `repo/update`. After install, the role prints installed
+versions and clears every item under `ANSIBLE_PACKAGE_UPDATE_INSTALLATION_DIR`,
+default `/media/installation`.

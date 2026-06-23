@@ -1,6 +1,7 @@
 # package_update
 
-Updates a fixed list of Ubuntu packages to exact versions.
+Updates selected Ubuntu packages to the latest available versions, or to exact
+versions when a package entry includes `version`.
 
 Set target hosts in `env.d/10-inventory.env`:
 
@@ -18,7 +19,7 @@ ANSIBLE_PACKAGE_UPDATE_REPO_SOURCE=./repo/update
 ANSIBLE_PACKAGE_UPDATE_REPO_DEST=/media/installation/update
 ANSIBLE_PACKAGE_UPDATE_CLEANUP_INSTALLATION_DIR=true
 ANSIBLE_PACKAGE_UPDATE_INSTALLATION_DIR=/media/installation
-ANSIBLE_PACKAGE_UPDATE_PACKAGES="[{name: libssl3t64, version: 3.0.13-0ubuntu3.11}]"
+ANSIBLE_PACKAGE_UPDATE_PACKAGES="[{name: libssl3t64}, {name: openssl}]"
 ```
 
 Run:
@@ -27,8 +28,9 @@ Run:
 ./scripts/run-ansible.sh deploy --tags package_update
 ```
 
-When `ANSIBLE_PACKAGE_UPDATE_INSTALL_FROM_LOCAL_REPO=true`, the fixed `.deb`
-files must exist in `ANSIBLE_PACKAGE_UPDATE_REPO_SOURCE`. The role copies them
-to `ANSIBLE_PACKAGE_UPDATE_REPO_DEST`, installs the matching package/version,
-verifies the installed version with `dpkg-query`, then clears every item under
-`ANSIBLE_PACKAGE_UPDATE_INSTALLATION_DIR`, default `/media/installation`.
+When `ANSIBLE_PACKAGE_UPDATE_INSTALL_FROM_LOCAL_REPO=true`, `.deb` files must
+exist in `ANSIBLE_PACKAGE_UPDATE_REPO_SOURCE`. The role copies them to
+`ANSIBLE_PACKAGE_UPDATE_REPO_DEST`, installs the latest matching local `.deb`
+for each package name, prints installed versions with `dpkg-query`, then clears
+every item under `ANSIBLE_PACKAGE_UPDATE_INSTALLATION_DIR`, default
+`/media/installation`.

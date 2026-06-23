@@ -5,9 +5,8 @@
       - package_update_packages is sequence
       - item.name is defined
       - item.name | length > 0
-      - item.version is defined
-      - item.version | string | length > 0
-    fail_msg: "Invalid package update entry. Expected {name, version}: {{ item }}"
+      - item.version is not defined or item.version | string | length > 0
+    fail_msg: "Invalid package update entry. Expected {name} or {name, version}: {{ item }}"
   loop: "{{ package_update_packages }}"
   tags:
     - package_update
@@ -20,18 +19,26 @@
   tags:
     - package_update
 
-- name: Build fixed apt package specs
+- name: Build apt package specs
   ansible.builtin.set_fact:
-    package_update_apt_package_specs: "{{ (package_update_apt_package_specs | default([])) + [item.name ~ '=' ~ item.version] }}"
+    package_update_apt_package_specs: >-
+      {{
+        (package_update_apt_package_specs | default([]))
+        + [
+          item.name ~ '=' ~ item.version
+          if item.version is defined and item.version | string | length > 0
+          else item.name
+        ]
+      }}
   loop: "{{ package_update_packages }}"
   when: not package_update_install_from_local_repo | bool
   tags:
     - package_update
 
-- name: Install fixed packages from apt repositories
+- name: Install package updates from apt repositories
   ansible.builtin.apt:
     name: "{{ package_update_apt_package_specs }}"
-    state: present
+    state: latest
     allow_downgrade: "{{ package_update_allow_downgrade | bool }}"
   when: not package_update_install_from_local_repo | bool
   tags:
@@ -59,23 +66,37 @@
   tags:
     - package_update
 
-- name: Find fixed local deb packages
+- name: Find local deb packages
   ansible.builtin.shell: |
     set -euo pipefail
     package_name="{{ item.name }}"
-    package_version="{{ item.version }}"
+    package_version="{{ item.version | default('') }}"
     found=""
+    found_version=""
     shopt -s nullglob
     for deb in "{{ package_update_repo_dest }}"/"${package_name}"_*.deb; do
       deb_name="$(dpkg-deb -f "${deb}" Package)"
       deb_version="$(dpkg-deb -f "${deb}" Version)"
-      if [[ "${deb_name}" == "${package_name}" && "${deb_version}" == "${package_version}" ]]; then
+      if [[ "${deb_name}" != "${package_name}" ]]; then
+        continue
+      fi
+      if [[ -n "${package_version}" ]]; then
+        if [[ "${deb_version}" == "${package_version}" ]]; then
+          found="${deb}"
+          found_version="${deb_version}"
+          break
+        fi
+      elif [[ -z "${found}" ]] || dpkg --compare-versions "${deb_version}" gt "${found_version}"; then
         found="${deb}"
-        break
+        found_version="${deb_version}"
       fi
     done
     if [[ -z "${found}" ]]; then
-      echo "Missing ${package_name}=${package_version} in {{ package_update_repo_dest }}" >&2
+      if [[ -n "${package_version}" ]]; then
+        echo "Missing ${package_name}=${package_version} in {{ package_update_repo_dest }}" >&2
+      else
+        echo "Missing latest local deb for ${package_name} in {{ package_update_repo_dest }}" >&2
+      fi
       exit 1
     fi
     printf '%s\n' "${found}"
@@ -88,7 +109,7 @@
   tags:
     - package_update
 
-- name: Install fixed packages from local deb files
+- name: Install package updates from local deb files
   ansible.builtin.command:
     argv: >-
       {{
@@ -100,7 +121,7 @@
   tags:
     - package_update
 
-- name: Verify fixed package versions
+- name: Check installed package versions
   ansible.builtin.command:
     argv:
       - dpkg-query
@@ -119,6 +140,15 @@
       - item.stdout == item.item.version
     fail_msg: "Package {{ item.item.name }} version is {{ item.stdout }}, expected {{ item.item.version }}"
   loop: "{{ package_update_version_check.results }}"
+  when: item.item.version is defined and item.item.version | string | length > 0
+  tags:
+    - package_update
+
+- name: Print installed latest package versions
+  ansible.builtin.debug:
+    msg: "Package {{ item.item.name }} installed version: {{ item.stdout }}"
+  loop: "{{ package_update_version_check.results }}"
+  when: item.item.version is not defined or item.item.version | string | length == 0
   tags:
     - package_update
 

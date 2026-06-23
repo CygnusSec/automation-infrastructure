@@ -52,9 +52,9 @@ in `env.d/90-offline-bundle.env`:
 ANSIBLE_PREREQUISITE_DOWNLOAD_PACKAGES=true
 ANSIBLE_PREREQUISITE_DOWNLOAD_IMAGE=ubuntu:24.04
 ANSIBLE_PREREQUISITE_OFFLINE_PACKAGES="apt-transport-https ca-certificates curl gnupg ipset ipset-persistent iptables-persistent lsb-release net-tools netfilter-persistent openssh-client python3 python3-apt python3-pip rsync sshpass telnet traceroute unzip vim wget"
-ANSIBLE_PACKAGE_UPDATE_OFFLINE_PACKAGES="libssl3t64=3.0.13-0ubuntu3.11 openssl=3.0.13-0ubuntu3.11 inetutils-telnet=2:2.5-3ubuntu4.2 telnet=0.17+2.5-3ubuntu4.2 vim=2:9.1.0016-1ubuntu7.15 vim-common=2:9.1.0016-1ubuntu7.15 vim-runtime=2:9.1.0016-1ubuntu7.15 vim-tiny=2:9.1.0016-1ubuntu7.15 xxd=2:9.1.0016-1ubuntu7.15"
+ANSIBLE_PACKAGE_UPDATE_OFFLINE_PACKAGES="libssl3t64 openssl inetutils-telnet telnet vim vim-common vim-runtime vim-tiny xxd"
 ```
 
 `ANSIBLE_PACKAGE_UPDATE_OFFLINE_PACKAGES` is downloaded separately into
 `ANSIBLE_PACKAGE_UPDATE_REPO_SOURCE`, default `Ansible/repo/update/`, so the
-targeted package update role can install fixed versions offline.
+targeted package update role can install latest local versions offline.

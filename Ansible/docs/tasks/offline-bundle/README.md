@@ -31,7 +31,7 @@ ANSIBLE_ZABBIX_SERVER_REPO_SOURCE=./repo/zabbix-server
 ANSIBLE_ZABBIX_SERVER_RELEASE_URL=https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb
 ANSIBLE_ZABBIX_SERVER_OFFLINE_PACKAGES="zabbix-server-pgsql zabbix-frontend-php php8.3-pgsql zabbix-nginx-conf zabbix-sql-scripts zabbix-agent systemd-sysv"
 ANSIBLE_PACKAGE_UPDATE_REPO_SOURCE=./repo/update
-ANSIBLE_PACKAGE_UPDATE_OFFLINE_PACKAGES="libssl3t64=3.0.13-0ubuntu3.11 openssl=3.0.13-0ubuntu3.11 inetutils-telnet=2:2.5-3ubuntu4.2 telnet=0.17+2.5-3ubuntu4.2 vim=2:9.1.0016-1ubuntu7.15 vim-common=2:9.1.0016-1ubuntu7.15 vim-runtime=2:9.1.0016-1ubuntu7.15 vim-tiny=2:9.1.0016-1ubuntu7.15 xxd=2:9.1.0016-1ubuntu7.15"
+ANSIBLE_PACKAGE_UPDATE_OFFLINE_PACKAGES="libssl3t64 openssl inetutils-telnet telnet vim vim-common vim-runtime vim-tiny xxd"
 ```
 
 Set `ANSIBLE_OFFLINE_BUNDLE_INCLUDE_REAL_ENV=true` in
@@ -42,6 +42,9 @@ bundle should be safe to hand off with templates only.
 The Zabbix package downloader runs in `ANSIBLE_ZABBIX_AGENT_DOWNLOAD_IMAGE`.
 Agent packages are written to `repo/zabbix`, while server packages are written
 to `repo/zabbix-server` by default.
+Package update `.deb` files are written to `repo/update`; unpinned package names
+download the latest available version from the online apt repository at build
+time.
 If apt reports invalid repository signatures, first check Docker disk space and
 the host clock on the online build machine.
 
