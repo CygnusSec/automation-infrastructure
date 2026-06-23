@@ -44,7 +44,7 @@ if [[ ! -f "${ENV_FILE}" ]]; then
 fi
 
 if [[ -d "${ENV_DIR}" ]]; then
-  for env_example in "${ENV_DIR}"/[0-7][0-9]-*.env.example; do
+  for env_example in "${ENV_DIR}"/[0-9][0-9]-*.env.example; do
     [[ -f "${env_example}" ]] || continue
     env_file="${env_example%.example}"
     if [[ ! -f "${env_file}" ]]; then

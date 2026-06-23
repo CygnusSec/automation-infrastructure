@@ -17,6 +17,7 @@ ANSIBLE_ENV_CONTEXT=offline_bundle load_ansible_env "${ROOT_DIR}"
 RUNTIME_IMAGE="${RUNTIME_IMAGE:-}"
 LOCAL_RUNTIME_IMAGE="${LOCAL_RUNTIME_IMAGE:-ansible-base-runtime:local}"
 ANSIBLE_DNS_TIME_SERVICES_BUILD_IMAGES="${ANSIBLE_DNS_TIME_SERVICES_BUILD_IMAGES:-true}"
+ANSIBLE_OFFLINE_BUNDLE_INCLUDE_REAL_ENV="${ANSIBLE_OFFLINE_BUNDLE_INCLUDE_REAL_ENV:-false}"
 ANSIBLE_DNS_SERVER_IMAGE="${ANSIBLE_DNS_SERVER_IMAGE:-local/bind9:offline}"
 ANSIBLE_DNS_SERVER_IMAGE_TAR="${ANSIBLE_DNS_SERVER_IMAGE_TAR:-./repo/docker-images/bind9.tar}"
 ANSIBLE_TIME_SERVER_IMAGE="${ANSIBLE_TIME_SERVER_IMAGE:-local/chrony:offline}"
@@ -25,6 +26,8 @@ ANSIBLE_PREREQUISITE_DOWNLOAD_PACKAGES="${ANSIBLE_PREREQUISITE_DOWNLOAD_PACKAGES
 ANSIBLE_PREREQUISITE_DOWNLOAD_IMAGE="${ANSIBLE_PREREQUISITE_DOWNLOAD_IMAGE:-ubuntu:24.04}"
 ANSIBLE_PREREQUISITE_REPO_SOURCE="${ANSIBLE_PREREQUISITE_REPO_SOURCE:-./repo/prerequisite}"
 ANSIBLE_PREREQUISITE_OFFLINE_PACKAGES="${ANSIBLE_PREREQUISITE_OFFLINE_PACKAGES:-apt-transport-https ca-certificates curl gnupg ipset ipset-persistent iptables-persistent lsb-release net-tools netfilter-persistent openssh-client python3 python3-apt python3-pip rsync sshpass telnet traceroute unzip vim wget}"
+ANSIBLE_PACKAGE_UPDATE_REPO_SOURCE="${ANSIBLE_PACKAGE_UPDATE_REPO_SOURCE:-./repo/update}"
+ANSIBLE_PACKAGE_UPDATE_OFFLINE_PACKAGES="${ANSIBLE_PACKAGE_UPDATE_OFFLINE_PACKAGES:-libssl3t64=3.0.13-0ubuntu3.11 openssl=3.0.13-0ubuntu3.11 inetutils-telnet=2:2.5-3ubuntu4.2 telnet=0.17+2.5-3ubuntu4.2 vim=2:9.1.0016-1ubuntu7.15 vim-common=2:9.1.0016-1ubuntu7.15 vim-runtime=2:9.1.0016-1ubuntu7.15 vim-tiny=2:9.1.0016-1ubuntu7.15 xxd=2:9.1.0016-1ubuntu7.15}"
 ANSIBLE_ZABBIX_AGENT_DOWNLOAD_PACKAGES="${ANSIBLE_ZABBIX_AGENT_DOWNLOAD_PACKAGES:-true}"
 ANSIBLE_ZABBIX_AGENT_DOWNLOAD_IMAGE="${ANSIBLE_ZABBIX_AGENT_DOWNLOAD_IMAGE:-ubuntu:24.04}"
 ANSIBLE_ZABBIX_AGENT_REPO_SOURCE="${ANSIBLE_ZABBIX_AGENT_REPO_SOURCE:-./repo/zabbix}"
@@ -150,6 +153,11 @@ if [[ "${ANSIBLE_PREREQUISITE_DOWNLOAD_PACKAGES}" == "true" ]]; then
     "$(project_path "${ANSIBLE_PREREQUISITE_REPO_SOURCE}")" \
     "${ANSIBLE_PREREQUISITE_OFFLINE_PACKAGES}" \
     "prerequisite"
+
+  download_ubuntu_packages \
+    "$(project_path "${ANSIBLE_PACKAGE_UPDATE_REPO_SOURCE}")" \
+    "${ANSIBLE_PACKAGE_UPDATE_OFFLINE_PACKAGES}" \
+    "package update"
 fi
 
 if [[ "${ANSIBLE_ZABBIX_AGENT_DOWNLOAD_PACKAGES}" == "true" ]]; then
@@ -222,16 +230,31 @@ tar \
 mkdir -p "${PROJECT_DIR}/inventories/customer-a/secrets"
 touch "${PROJECT_DIR}/inventories/customer-a/secrets/.gitkeep"
 
-# Copy .env.example files as starting templates so the operator only needs
-# to fill in values rather than creating files from scratch.
-if [[ -f "${ROOT_DIR}/.env.example" ]]; then
-  cp "${ROOT_DIR}/.env.example" "${PROJECT_DIR}/.env"
+if [[ "${ANSIBLE_OFFLINE_BUNDLE_INCLUDE_REAL_ENV}" == "true" ]]; then
+  echo "Copying real .env and env.d/*.env files into offline bundle."
+  if [[ -f "${ROOT_DIR}/.env" ]]; then
+    cp "${ROOT_DIR}/.env" "${PROJECT_DIR}/.env"
+  elif [[ -f "${ROOT_DIR}/.env.example" ]]; then
+    cp "${ROOT_DIR}/.env.example" "${PROJECT_DIR}/.env"
+  fi
+
+  shopt -s nullglob
+  for env_file in "${ROOT_DIR}"/env.d/*.env; do
+    cp "${env_file}" "${PROJECT_DIR}/env.d/$(basename "${env_file}")"
+  done
+  shopt -u nullglob
+else
+  # Copy .env.example files as starting templates so the operator only needs
+  # to fill in values rather than creating files from scratch.
+  if [[ -f "${ROOT_DIR}/.env.example" ]]; then
+    cp "${ROOT_DIR}/.env.example" "${PROJECT_DIR}/.env"
+  fi
+  for example_file in "${ROOT_DIR}"/env.d/*.env.example; do
+    [[ -f "${example_file}" ]] || continue
+    target="${PROJECT_DIR}/env.d/$(basename "${example_file}" .example)"
+    cp "${example_file}" "${target}"
+  done
 fi
-for example_file in "${ROOT_DIR}"/env.d/*.env.example; do
-  [[ -f "${example_file}" ]] || continue
-  target="${PROJECT_DIR}/env.d/$(basename "${example_file}" .example)"
-  cp "${example_file}" "${target}"
-done
 
 echo "${PACKAGE_IMAGE}" > "${IMAGE_DIR}/runtime-image.txt"
 

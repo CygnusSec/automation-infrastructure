@@ -1,0 +1,28 @@
+---
+package_update_enabled: false
+package_update_install_from_local_repo: true
+package_update_repo_source: ./repo/update
+package_update_repo_dest: /media/installation/update
+package_update_cleanup_installation_dir: true
+package_update_installation_dir: /media/installation
+package_update_cache_valid_time: 3600
+package_update_allow_downgrade: false
+package_update_packages:
+  - name: libssl3t64
+    version: 3.0.13-0ubuntu3.11
+  - name: openssl
+    version: 3.0.13-0ubuntu3.11
+  - name: inetutils-telnet
+    version: "2:2.5-3ubuntu4.2"
+  - name: telnet
+    version: 0.17+2.5-3ubuntu4.2
+  - name: vim
+    version: "2:9.1.0016-1ubuntu7.15"
+  - name: vim-common
+    version: "2:9.1.0016-1ubuntu7.15"
+  - name: vim-runtime
+    version: "2:9.1.0016-1ubuntu7.15"
+  - name: vim-tiny
+    version: "2:9.1.0016-1ubuntu7.15"
+  - name: xxd
+    version: "2:9.1.0016-1ubuntu7.15"

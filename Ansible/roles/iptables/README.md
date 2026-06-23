@@ -105,8 +105,10 @@ Zabbix server host, the role only opens polling traffic to agent hosts on
 `10050/tcp`; it does not add active-agent `10051/tcp` rules to itself.
 
 DNS/time rules allow clients to reach DNS servers on `53/tcp` and `53/udp`,
-and time servers on `123/udp`. They also allow local hosts to query the
-configured DNS/time server IPs.
+and time servers on `123/udp`. On DNS/time server hosts, `OUTPUT` uses
+`--sport 53` and `--sport 123` back to `common_dns_time_clients`. On other
+hosts, `OUTPUT` uses `--dport 53` and `--dport 123` to
+`common_dns_time_servers`.
 When `ANSIBLE_IPTABLES_DNS_TIME_CLIENT_SOURCES=[]`, DNS/time server hosts allow
 all hosts in `ANSIBLE_IPTABLES_TARGET_GROUP` to connect to those DNS/time
 ports. Set this variable to a YAML list of source IPs/CIDRs to restrict access.
@@ -117,6 +119,11 @@ ports. Set this variable to a YAML list of source IPs/CIDRs to restrict access.
 `ANSIBLE_IPTABLES_INBOUND_SERVICE_RULES` applies only on hosts whose IP is in
 `target_ips`. It allows `source_ips` to connect to the configured `ports` and
 adds the matching response `OUTPUT` rules.
+
+`ANSIBLE_IPTABLES_EXTERNAL_SERVICE_RULES` is client-side on hosts outside the
+service IP list. If the current host IP is listed in a rule's `ips`, that host
+is treated as the service server and gets `INPUT --dport` plus `OUTPUT --sport`
+rules for the configured ports.
 
 When `ANSIBLE_IPTABLES_MANAGE_IPSETS=true`, the role creates common ipsets for
 SSH sources, DNS/time servers, Zabbix servers/agents, and configured service

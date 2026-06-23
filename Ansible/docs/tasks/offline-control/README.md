@@ -7,7 +7,7 @@ offline bundle.
 
 - loads `../image-runtime/ansible-runtime.tar`
 - creates `.env` from `.env.example` if `.env` does not exist
-- creates missing `env.d/[0-7][0-9]-*.env` files from their examples
+- creates missing `env.d/[0-9][0-9]-*.env` files from their examples
 - sets offline runtime variables in `.env`
 - pins `LOCAL_RUNTIME_IMAGE` to the packaged runtime image
 - leaves existing `.env` and `env.d/*.env` values in place except for the

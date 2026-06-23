@@ -77,6 +77,16 @@
     - iptables_block
     - iptables_save
 
+- name: Apply targeted package updates
+  hosts: "{{ lookup('env', 'ANSIBLE_PACKAGE_UPDATE_TARGET_GROUP') | default('package_update_targets', true) }}"
+  gather_facts: false
+  become: true
+  roles:
+    - role: package_update
+      when: package_update_enabled | bool
+  tags:
+    - package_update
+
 - name: Install Zabbix server
   hosts: "{{ lookup('env', 'ANSIBLE_ZABBIX_SERVER_TARGET_GROUP') | default('zabbix_server_targets', true) }}"
   gather_facts: false

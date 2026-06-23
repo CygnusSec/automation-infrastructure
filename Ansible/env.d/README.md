@@ -40,6 +40,7 @@ env.d/40-dns-time.env        # DNS/time services and NTP clients
 env.d/50-external-disk.env   # external disk mounts
 env.d/60-docker-swarm.env    # Docker Swarm
 env.d/70-tldh-database.env   # TLDH database master/slave
+env.d/80-package-update.env  # targeted Ubuntu package updates
 env.d/90-offline-bundle.env  # online build/offline bundle settings
 ```
 
@@ -54,3 +55,4 @@ env.d/90-offline-bundle.env  # online build/offline bundle settings
 | `external_disk` | `50-external-disk.env` |
 | `docker_swarm`, `docker_swarm_leave`, `docker_swarm_iptables`, `docker_swarm_iptables_ipsets`, `docker_swarm_iptables_nodes`, `docker_swarm_iptables_allow_connect_in`, `docker_swarm_iptables_allow_connect_out`, `docker_swarm_iptables_docker_user_drop`, `docker_swarm_iptables_save` | `60-docker-swarm.env` |
 | `tldh_database` | `70-tldh-database.env` |
+| `package_update` | `80-package-update.env` |

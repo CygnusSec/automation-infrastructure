@@ -297,6 +297,20 @@
     iptables_managed_ipsets: []
     iptables_managed_ipset_entries: []
     iptables_local_ip: "{{ ansible_host | default(inventory_hostname) }}"
+    iptables_target_ips: []
+  tags:
+    - iptables
+
+- name: Resolve iptables target IPs from target group
+  ansible.builtin.set_fact:
+    iptables_target_ips: >-
+      {{
+        (iptables_target_ips | default([]))
+        + [
+          hostvars[item].ansible_host | default(item)
+        ]
+      }}
+  loop: "{{ groups[iptables_target_group] | default([]) }}"
   tags:
     - iptables
 
@@ -307,7 +321,8 @@
         iptables_external_service_ipset_rules
         + [
           item | combine({
-            'ipset_name': ((iptables_ipset_prefix ~ '_' ~ item.name) | regex_replace('[^A-Za-z0-9_:-]', '_'))
+            'ipset_name': ((iptables_ipset_prefix ~ '_' ~ item.name) | regex_replace('[^A-Za-z0-9_:-]', '_')),
+            'client_ips': (iptables_target_ips | reject('equalto', iptables_local_ip) | list)
           })
         ]
       }}
@@ -368,6 +383,44 @@
         ]
       }}
   loop: "{{ iptables_external_service_ipset_rules }}"
+  when: iptables_local_ip not in item.ips
+  tags:
+    - iptables
+
+- name: Add iptables local external service server rules
+  ansible.builtin.set_fact:
+    iptables_service_rules: >-
+      {{
+        iptables_service_rules
+        + [
+          {
+            'chain': 'INPUT',
+            'args': [
+              '-m', 'set',
+              '--match-set', item.ipset_name,
+              'src',
+              '-p', item.protocol | default('tcp'),
+              '-m', 'multiport',
+              '--dports', item.ports | map('string') | join(','),
+              '-j', 'ACCEPT'
+            ]
+          },
+          {
+            'chain': 'OUTPUT',
+            'args': [
+              '-m', 'set',
+              '--match-set', item.ipset_name,
+              'dst',
+              '-p', item.protocol | default('tcp'),
+              '-m', 'multiport',
+              '--sports', item.ports | map('string') | join(','),
+              '-j', 'ACCEPT'
+            ]
+          }
+        ]
+      }}
+  loop: "{{ iptables_external_service_ipset_rules }}"
+  when: iptables_local_ip in item.ips
   tags:
     - iptables
 
@@ -405,21 +458,7 @@
         | reject('equalto', ansible_host | default(inventory_hostname))
         | list
       }}
-    iptables_target_ips: []
     iptables_zabbix_agent_ips: []
-  tags:
-    - iptables
-
-- name: Resolve iptables target IPs from target group
-  ansible.builtin.set_fact:
-    iptables_target_ips: >-
-      {{
-        (iptables_target_ips | default([]))
-        + [
-          hostvars[item].ansible_host | default(item)
-        ]
-      }}
-  loop: "{{ groups[iptables_target_group] | default([]) }}"
   tags:
     - iptables
 
@@ -576,6 +615,18 @@
           {
             'chain': 'INPUT',
             'args': ['-m', 'set', '--match-set', iptables_ipset_dns_time_clients_name, 'src', '-p', 'udp', '--dport', iptables_time_port | string, '-j', 'ACCEPT']
+          },
+          {
+            'chain': 'OUTPUT',
+            'args': ['-m', 'set', '--match-set', iptables_ipset_dns_time_clients_name, 'dst', '-p', 'tcp', '--sport', iptables_dns_port | string, '-j', 'ACCEPT']
+          },
+          {
+            'chain': 'OUTPUT',
+            'args': ['-m', 'set', '--match-set', iptables_ipset_dns_time_clients_name, 'dst', '-p', 'udp', '--sport', iptables_dns_port | string, '-j', 'ACCEPT']
+          },
+          {
+            'chain': 'OUTPUT',
+            'args': ['-m', 'set', '--match-set', iptables_ipset_dns_time_clients_name, 'dst', '-p', 'udp', '--sport', iptables_time_port | string, '-j', 'ACCEPT']
           }
         ]
       }}
@@ -607,6 +658,7 @@
         ]
       }}
   loop: "{{ [iptables_ipset_dns_time_servers_name] }}"
+  when: iptables_local_ip not in iptables_dns_time_server_ips
   tags:
     - iptables
 
@@ -648,8 +700,8 @@
         (
           [
             iptables_ipset_ssh_sources_name,
-            iptables_ipset_dns_time_servers_name
           ]
+          + ([iptables_ipset_dns_time_servers_name] if (iptables_local_ip not in iptables_dns_time_server_ips) else [])
           + ([iptables_ipset_dns_time_clients_name] if (iptables_local_ip in iptables_dns_time_server_ips and iptables_dns_time_effective_client_sources | length > 0) else [])
           + ([iptables_ipset_zabbix_servers_name] if (iptables_local_ip not in iptables_zabbix_server_ips) else [])
           + ([iptables_ipset_zabbix_agents_name] if (iptables_local_ip in iptables_zabbix_server_ips) else [])
@@ -710,6 +762,16 @@
   ansible.builtin.set_fact:
     iptables_managed_ipset_entries: "{{ iptables_managed_ipset_entries + [{'set_name': item.0.ipset_name, 'ip': item.1}] }}"
   loop: "{{ iptables_external_service_ipset_rules | subelements('ips') }}"
+  when: iptables_local_ip not in item.0.ips
+  tags:
+    - iptables
+    - iptables_primary
+
+- name: Add common iptables local external service client ipset entries
+  ansible.builtin.set_fact:
+    iptables_managed_ipset_entries: "{{ iptables_managed_ipset_entries + [{'set_name': item.0.ipset_name, 'ip': item.1}] }}"
+  loop: "{{ iptables_external_service_ipset_rules | subelements('client_ips') }}"
+  when: iptables_local_ip in item.0.ips
   tags:
     - iptables
     - iptables_primary

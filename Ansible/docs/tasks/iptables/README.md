@@ -80,9 +80,12 @@ so each whitelist also names the allowed port.
 
 `ANSIBLE_IPTABLES_EXTERNAL_SERVICE_RULES` is a YAML list of service definitions.
 Each item supports `name`, `ips`, `ports`, and optional `protocol` (`tcp` by
-default). Use it only for non-Swarm host traffic. Swarm container external
-service traffic should be set in `ANSIBLE_DOCKER_SWARM_EXTERNAL_SERVICE_RULES`
-so it is written to `DOCKER-USER`.
+default). Use it only for non-Swarm host traffic. On hosts that are not in
+`ips`, the role allows client `OUTPUT --dport` traffic to the service IP set.
+On a host whose local IP is in `ips`, the role treats that host as the service
+server and allows `INPUT --dport` plus matching `OUTPUT --sport` traffic to the
+target host IP set. Swarm container external service traffic should be set in
+`ANSIBLE_DOCKER_SWARM_EXTERNAL_SERVICE_RULES` so it is written to `DOCKER-USER`.
 
 `ANSIBLE_IPTABLES_INBOUND_SERVICE_RULES` is a YAML list for services hosted on
 the current target. A rule applies only when the host IP is in `target_ips`,
@@ -108,7 +111,11 @@ addresses or CIDRs. `ANSIBLE_IPTABLES_DNS_TIME_CLIENT_SOURCES` is a YAML list of
 client source IPv4 addresses or CIDRs allowed to query local DNS/time services.
 When `ANSIBLE_IPTABLES_DNS_TIME_CLIENT_SOURCES=[]`, DNS/time server hosts allow
 all hosts in `ANSIBLE_IPTABLES_TARGET_GROUP` to connect to `53/tcp`, `53/udp`,
-and `123/udp`.
+and `123/udp`. On DNS/time server hosts, return traffic is allowed with
+`OUTPUT --sport 53` and `OUTPUT --sport 123` to
+`common_dns_time_clients`. On non-server hosts, client traffic is allowed with
+`OUTPUT --dport 53` and `OUTPUT --dport 123` to
+`common_dns_time_servers`.
 
 `ANSIBLE_IPTABLES_BLOCK_CHAINS` supports only `INPUT`, `FORWARD`, and `OUTPUT`.
 

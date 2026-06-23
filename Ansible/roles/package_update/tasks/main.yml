@@ -1,0 +1,147 @@
+---
+- name: Validate package update definitions
+  ansible.builtin.assert:
+    that:
+      - package_update_packages is sequence
+      - item.name is defined
+      - item.name | length > 0
+      - item.version is defined
+      - item.version | string | length > 0
+    fail_msg: "Invalid package update entry. Expected {name, version}: {{ item }}"
+  loop: "{{ package_update_packages }}"
+  tags:
+    - package_update
+
+- name: Update apt cache for package updates
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: "{{ package_update_cache_valid_time }}"
+  when: not package_update_install_from_local_repo | bool
+  tags:
+    - package_update
+
+- name: Build fixed apt package specs
+  ansible.builtin.set_fact:
+    package_update_apt_package_specs: "{{ (package_update_apt_package_specs | default([])) + [item.name ~ '=' ~ item.version] }}"
+  loop: "{{ package_update_packages }}"
+  when: not package_update_install_from_local_repo | bool
+  tags:
+    - package_update
+
+- name: Install fixed packages from apt repositories
+  ansible.builtin.apt:
+    name: "{{ package_update_apt_package_specs }}"
+    state: present
+    allow_downgrade: "{{ package_update_allow_downgrade | bool }}"
+  when: not package_update_install_from_local_repo | bool
+  tags:
+    - package_update
+
+- name: Create package update local repo directory
+  ansible.builtin.file:
+    path: "{{ package_update_repo_dest }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: package_update_install_from_local_repo | bool
+  tags:
+    - package_update
+
+- name: Copy package update local deb repository
+  ansible.builtin.copy:
+    src: "{{ package_update_repo_source }}/"
+    dest: "{{ package_update_repo_dest }}/"
+    owner: root
+    group: root
+    mode: preserve
+  when: package_update_install_from_local_repo | bool
+  tags:
+    - package_update
+
+- name: Find fixed local deb packages
+  ansible.builtin.shell: |
+    set -euo pipefail
+    package_name="{{ item.name }}"
+    package_version="{{ item.version }}"
+    found=""
+    shopt -s nullglob
+    for deb in "{{ package_update_repo_dest }}"/"${package_name}"_*.deb; do
+      deb_name="$(dpkg-deb -f "${deb}" Package)"
+      deb_version="$(dpkg-deb -f "${deb}" Version)"
+      if [[ "${deb_name}" == "${package_name}" && "${deb_version}" == "${package_version}" ]]; then
+        found="${deb}"
+        break
+      fi
+    done
+    if [[ -z "${found}" ]]; then
+      echo "Missing ${package_name}=${package_version} in {{ package_update_repo_dest }}" >&2
+      exit 1
+    fi
+    printf '%s\n' "${found}"
+  args:
+    executable: /bin/bash
+  register: package_update_local_deb_find
+  changed_when: false
+  loop: "{{ package_update_packages }}"
+  when: package_update_install_from_local_repo | bool
+  tags:
+    - package_update
+
+- name: Install fixed packages from local deb files
+  ansible.builtin.command:
+    argv: >-
+      {{
+        ['apt-get', 'install', '-y']
+        + (['--allow-downgrades'] if package_update_allow_downgrade | bool else [])
+        + (package_update_local_deb_find.results | map(attribute='stdout') | list)
+      }}
+  when: package_update_install_from_local_repo | bool
+  tags:
+    - package_update
+
+- name: Verify fixed package versions
+  ansible.builtin.command:
+    argv:
+      - dpkg-query
+      - -W
+      - -f=${Version}
+      - "{{ item.name }}"
+  register: package_update_version_check
+  changed_when: false
+  loop: "{{ package_update_packages }}"
+  tags:
+    - package_update
+
+- name: Assert fixed package versions
+  ansible.builtin.assert:
+    that:
+      - item.stdout == item.item.version
+    fail_msg: "Package {{ item.item.name }} version is {{ item.stdout }}, expected {{ item.item.version }}"
+  loop: "{{ package_update_version_check.results }}"
+  tags:
+    - package_update
+
+- name: Find package update installation directory contents for cleanup
+  ansible.builtin.find:
+    paths: "{{ package_update_installation_dir }}"
+    file_type: any
+    hidden: true
+    recurse: false
+  register: package_update_installation_cleanup_items
+  when:
+    - package_update_install_from_local_repo | bool
+    - package_update_cleanup_installation_dir | bool
+  tags:
+    - package_update
+
+- name: Clear package update installation directory after install
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ package_update_installation_cleanup_items.files | default([]) }}"
+  when:
+    - package_update_install_from_local_repo | bool
+    - package_update_cleanup_installation_dir | bool
+  tags:
+    - package_update

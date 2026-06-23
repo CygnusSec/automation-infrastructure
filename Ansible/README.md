@@ -216,6 +216,7 @@ Tag-to-env mapping:
 | `external_disk` | `env.d/50-external-disk.env` |
 | `docker_swarm`, `docker_swarm_iptables` | `env.d/60-docker-swarm.env` |
 | `tldh_database` | `env.d/70-tldh-database.env` |
+| `package_update` | `env.d/80-package-update.env` |
 
 Ansible variables are mapped from environment variables in:
 
@@ -516,6 +517,14 @@ cp env.d/90-offline-bundle.env.example env.d/90-offline-bundle.env
 ./scripts/build-offline-bundle.sh
 ```
 
+By default the bundle includes `.env` and `env.d/*.env` files generated from
+the tracked examples. To include the current real env values instead, set this
+in `env.d/90-offline-bundle.env` before building:
+
+```env
+ANSIBLE_OFFLINE_BUNDLE_INCLUDE_REAL_ENV=true
+```
+
 The build script also builds and saves the Dockerized DNS/time service images
 when `ANSIBLE_DNS_TIME_SERVICES_BUILD_IMAGES=true` or unset:
 
@@ -569,7 +578,7 @@ cd project
 ```
 
 The prepare script loads `../image-runtime/ansible-runtime.tar`, creates `.env`
-from `.env.example` when needed, creates missing `env.d/[0-7][0-9]-*.env`
+from `.env.example` when needed, creates missing `env.d/[0-9][0-9]-*.env`
 files from their examples, sets `ANSIBLE_CONTROL_OFFLINE=true`, and pins
 `LOCAL_RUNTIME_IMAGE` to the packaged image name.
 

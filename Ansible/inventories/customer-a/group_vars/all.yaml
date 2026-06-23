@@ -91,6 +91,18 @@ iptables_time_port: "{{ (lookup('env', 'ANSIBLE_IPTABLES_TIME_PORT') | default('
 iptables_block_enabled: "{{ (lookup('env', 'ANSIBLE_IPTABLES_BLOCK_ENABLED') | default('false', true)) | bool }}"
 iptables_block_chains: "{{ lookup('env', 'ANSIBLE_IPTABLES_BLOCK_CHAINS') | default('[INPUT, FORWARD, OUTPUT]', true) | from_yaml }}"
 
+# Targeted package update role
+package_update_enabled: "{{ (lookup('env', 'ANSIBLE_PACKAGE_UPDATE_ENABLED') | default('false', true)) | bool }}"
+package_update_target_group: "{{ lookup('env', 'ANSIBLE_PACKAGE_UPDATE_TARGET_GROUP') | default('package_update_targets', true) }}"
+package_update_install_from_local_repo: "{{ (lookup('env', 'ANSIBLE_PACKAGE_UPDATE_INSTALL_FROM_LOCAL_REPO') | default('true', true)) | bool }}"
+package_update_repo_source: "{{ lookup('env', 'ANSIBLE_PACKAGE_UPDATE_REPO_SOURCE') | default('./repo/update', true) }}"
+package_update_repo_dest: "{{ lookup('env', 'ANSIBLE_PACKAGE_UPDATE_REPO_DEST') | default('/media/installation/update', true) }}"
+package_update_cleanup_installation_dir: "{{ (lookup('env', 'ANSIBLE_PACKAGE_UPDATE_CLEANUP_INSTALLATION_DIR') | default('true', true)) | bool }}"
+package_update_installation_dir: "{{ lookup('env', 'ANSIBLE_PACKAGE_UPDATE_INSTALLATION_DIR') | default('/media/installation', true) }}"
+package_update_cache_valid_time: "{{ (lookup('env', 'ANSIBLE_PACKAGE_UPDATE_CACHE_VALID_TIME') | default('3600', true)) | int }}"
+package_update_allow_downgrade: "{{ (lookup('env', 'ANSIBLE_PACKAGE_UPDATE_ALLOW_DOWNGRADE') | default('false', true)) | bool }}"
+package_update_packages: "{{ lookup('env', 'ANSIBLE_PACKAGE_UPDATE_PACKAGES') | default('[{name: libssl3t64, version: 3.0.13-0ubuntu3.11}, {name: openssl, version: 3.0.13-0ubuntu3.11}, {name: inetutils-telnet, version: ''2:2.5-3ubuntu4.2''}, {name: telnet, version: 0.17+2.5-3ubuntu4.2}, {name: vim, version: ''2:9.1.0016-1ubuntu7.15''}, {name: vim-common, version: ''2:9.1.0016-1ubuntu7.15''}, {name: vim-runtime, version: ''2:9.1.0016-1ubuntu7.15''}, {name: vim-tiny, version: ''2:9.1.0016-1ubuntu7.15''}, {name: xxd, version: ''2:9.1.0016-1ubuntu7.15''}]', true) | from_yaml }}"
+
 # SSH bootstrap.
 ssh_copy_id_public_key_file: "{{ lookup('env', 'ANSIBLE_SSH_COPY_ID_PUBLIC_KEY_FILE') | default(ansible_ssh_private_key_file ~ '.pub', true) }}"
 ssh_copy_id_target_group: "{{ lookup('env', 'ANSIBLE_SSH_COPY_ID_TARGET_GROUP') | default('ssh_copy_id_targets', true) }}"
