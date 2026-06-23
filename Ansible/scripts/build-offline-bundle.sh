@@ -17,7 +17,7 @@ ANSIBLE_ENV_CONTEXT=offline_bundle load_ansible_env "${ROOT_DIR}"
 RUNTIME_IMAGE="${RUNTIME_IMAGE:-}"
 LOCAL_RUNTIME_IMAGE="${LOCAL_RUNTIME_IMAGE:-ansible-base-runtime:local}"
 ANSIBLE_DNS_TIME_SERVICES_BUILD_IMAGES="${ANSIBLE_DNS_TIME_SERVICES_BUILD_IMAGES:-true}"
-ANSIBLE_OFFLINE_BUNDLE_INCLUDE_REAL_ENV="${ANSIBLE_OFFLINE_BUNDLE_INCLUDE_REAL_ENV:-false}"
+ANSIBLE_OFFLINE_BUNDLE_INCLUDE_REAL_ENV="${ANSIBLE_OFFLINE_BUNDLE_INCLUDE_REAL_ENV:-true}"
 ANSIBLE_DNS_SERVER_IMAGE="${ANSIBLE_DNS_SERVER_IMAGE:-local/bind9:offline}"
 ANSIBLE_DNS_SERVER_IMAGE_TAR="${ANSIBLE_DNS_SERVER_IMAGE_TAR:-./repo/docker-images/bind9.tar}"
 ANSIBLE_TIME_SERVER_IMAGE="${ANSIBLE_TIME_SERVER_IMAGE:-local/chrony:offline}"
@@ -220,7 +220,9 @@ tar \
   --exclude='.codex' \
   --exclude='dist' \
   --exclude='./.env' \
+  --exclude='./.env.example' \
   --exclude='./env.d/*.env' \
+  --exclude='./env.d/*.env.example' \
   --exclude='./inventories/customer-a/secrets/id_*' \
   --exclude='./inventories/customer-a/secrets/*.yaml' \
   -C "${ROOT_DIR}" \
@@ -234,15 +236,23 @@ if [[ "${ANSIBLE_OFFLINE_BUNDLE_INCLUDE_REAL_ENV}" == "true" ]]; then
   echo "Copying real .env and env.d/*.env files into offline bundle."
   if [[ -f "${ROOT_DIR}/.env" ]]; then
     cp "${ROOT_DIR}/.env" "${PROJECT_DIR}/.env"
-  elif [[ -f "${ROOT_DIR}/.env.example" ]]; then
-    cp "${ROOT_DIR}/.env.example" "${PROJECT_DIR}/.env"
+  else
+    echo "ERROR: ANSIBLE_OFFLINE_BUNDLE_INCLUDE_REAL_ENV=true but ${ROOT_DIR}/.env does not exist." >&2
+    exit 1
   fi
 
+  mkdir -p "${PROJECT_DIR}/env.d"
   shopt -s nullglob
+  real_env_count=0
   for env_file in "${ROOT_DIR}"/env.d/*.env; do
     cp "${env_file}" "${PROJECT_DIR}/env.d/$(basename "${env_file}")"
+    real_env_count=$((real_env_count + 1))
   done
   shopt -u nullglob
+  if [[ "${real_env_count}" -eq 0 ]]; then
+    echo "ERROR: ANSIBLE_OFFLINE_BUNDLE_INCLUDE_REAL_ENV=true but no env.d/*.env files exist." >&2
+    exit 1
+  fi
 else
   # Copy .env.example files as starting templates so the operator only needs
   # to fill in values rather than creating files from scratch.
