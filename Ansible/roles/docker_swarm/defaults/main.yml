@@ -11,6 +11,20 @@ docker_swarm_manager_addr: ""
 
 docker_swarm_manage_iptables: false
 docker_swarm_manage_encrypted_overlay_esp: false
+docker_swarm_service_allowed_source_ips: []
+docker_swarm_service_host_interface: ""
+docker_swarm_service_bridge_interface: docker_gwbridge
+docker_swarm_service_ports:
+  - 80
+docker_swarm_service_ports_by_host: {}
+docker_swarm_external_service_rules: []
+docker_swarm_external_service_rules_by_host: {}
+docker_swarm_logger_node_tag: logger
+docker_swarm_logger_port: 514
+docker_swarm_logger_protocols:
+  - tcp
+  - udp
+docker_swarm_docker_user_drop_enabled: false
 
 docker_swarm_group_labels: {}
 docker_swarm_node_labels: {}

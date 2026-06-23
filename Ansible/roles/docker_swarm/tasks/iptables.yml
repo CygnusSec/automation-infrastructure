@@ -12,9 +12,11 @@
     docker_swarm_iptables_local_ip: "{{ docker_swarm_advertise_addr | default(ansible_host | default(inventory_hostname)) }}"
     docker_swarm_iptables_node_ips: []
     docker_swarm_iptables_manager_ips: []
+    docker_swarm_iptables_logger_ips: []
   tags:
     - docker_swarm
     - docker_swarm_iptables
+    - always
 
 - name: Resolve Docker Swarm iptables node IPs
   ansible.builtin.set_fact:
@@ -30,6 +32,7 @@
   tags:
     - docker_swarm
     - docker_swarm_iptables
+    - always
 
 - name: Resolve Docker Swarm iptables manager IPs
   ansible.builtin.set_fact:
@@ -45,13 +48,51 @@
   tags:
     - docker_swarm
     - docker_swarm_iptables
+    - always
+
+- name: Resolve Docker Swarm logger IPs
+  ansible.builtin.set_fact:
+    docker_swarm_iptables_logger_ips: >-
+      {{
+        (docker_swarm_iptables_logger_ips | default([]))
+        + [
+          hostvars[item].docker_swarm_advertise_addr
+          | default(hostvars[item].ansible_host | default(item))
+        ]
+      }}
+  loop: "{{ docker_swarm_iptables_node_hosts }}"
+  when: (hostvars[item].docker_swarm_node_labels | default({})).node_tag | default('') == docker_swarm_logger_node_tag
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
 
 - name: Initialize Docker Swarm iptables rules
   ansible.builtin.set_fact:
     docker_swarm_iptables_rules: []
+    docker_swarm_iptables_group_labels: {}
   tags:
     - docker_swarm
     - docker_swarm_iptables
+    - always
+
+- name: Build Docker Swarm iptables labels from inventory groups
+  ansible.builtin.set_fact:
+    docker_swarm_iptables_group_labels: "{{ docker_swarm_iptables_group_labels | combine(item.value) }}"
+  loop: "{{ docker_swarm_group_labels | dict2items }}"
+  when: item.key in group_names
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
+
+- name: Build Docker Swarm iptables labels for this node
+  ansible.builtin.set_fact:
+    docker_swarm_iptables_node_labels: "{{ docker_swarm_iptables_group_labels | combine(docker_swarm_node_labels) }}"
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
 
 - name: Add Docker Swarm manager join client rules
   ansible.builtin.set_fact:
@@ -74,6 +115,7 @@
   tags:
     - docker_swarm
     - docker_swarm_iptables
+    - always
 
 - name: Add Docker Swarm manager join server rules
   ansible.builtin.set_fact:
@@ -98,6 +140,7 @@
   tags:
     - docker_swarm
     - docker_swarm_iptables
+    - always
 
 - name: Add Docker Swarm peer discovery and overlay rules
   ansible.builtin.set_fact:
@@ -124,6 +167,7 @@
   tags:
     - docker_swarm
     - docker_swarm_iptables
+    - always
 
 - name: Add Docker Swarm encrypted overlay ESP rules
   ansible.builtin.set_fact:
@@ -142,35 +186,310 @@
   tags:
     - docker_swarm
     - docker_swarm_iptables
+    - always
 
-- name: Remove existing Docker Swarm iptables rules before reinserting
-  ansible.builtin.command:
-    argv: "{{ ['iptables', '-D', item.chain] + item.args }}"
-  register: docker_swarm_iptables_delete
-  changed_when: docker_swarm_iptables_delete.rc == 0
-  failed_when: false
-  loop: "{{ docker_swarm_iptables_rules }}"
+- name: Validate Docker Swarm logger iptables inputs
+  ansible.builtin.assert:
+    that:
+      - docker_swarm_logger_port | int >= 1
+      - docker_swarm_logger_port | int <= 65535
+      - docker_swarm_logger_protocols is sequence
+      - docker_swarm_logger_protocols | length > 0
+      - item in ['tcp', 'udp']
+    fail_msg: "Set valid Docker Swarm logger protocols and port."
+  loop: "{{ docker_swarm_logger_protocols }}"
+  when: (docker_swarm_iptables_node_labels | default({})).node_tag | default('') == docker_swarm_logger_node_tag
   tags:
     - docker_swarm
     - docker_swarm_iptables
+    - always
 
-- name: Check Docker Swarm iptables rules
-  ansible.builtin.command:
-    argv: "{{ ['iptables', '-C', item.chain] + item.args }}"
-  register: docker_swarm_iptables_check
-  changed_when: false
-  failed_when: false
-  loop: "{{ docker_swarm_iptables_rules }}"
+- name: Add Docker Swarm logger input rules
+  ansible.builtin.set_fact:
+    docker_swarm_iptables_rules: >-
+      {{
+        docker_swarm_iptables_rules
+        + [
+          {
+            'chain': 'INPUT',
+            'args': [
+              '-p', item.1,
+              '-s', item.0,
+              '--dport', docker_swarm_logger_port | string,
+              '-j', 'ACCEPT'
+            ]
+          },
+          {
+            'chain': 'OUTPUT',
+            'args': [
+              '-p', item.1,
+              '-d', item.0,
+              '--sport', docker_swarm_logger_port | string,
+              '-j', 'ACCEPT'
+            ]
+          }
+        ]
+      }}
+  loop: "{{ (docker_swarm_iptables_node_ips | default([]) | unique | difference([docker_swarm_iptables_local_ip])) | product(docker_swarm_logger_protocols) | list }}"
+  when: (docker_swarm_iptables_node_labels | default({})).node_tag | default('') == docker_swarm_logger_node_tag
   tags:
     - docker_swarm
     - docker_swarm_iptables
+    - always
 
-- name: Allow Docker Swarm iptables traffic
-  ansible.builtin.command:
-    argv: "{{ ['iptables', '-I', item.item.chain] + item.item.args }}"
-  changed_when: true
-  loop: "{{ docker_swarm_iptables_check.results }}"
-  when: item.rc != 0
+- name: Validate Docker Swarm service DOCKER-USER inputs
+  ansible.builtin.assert:
+    that:
+      - docker_swarm_service_host_interface | length > 0
+      - docker_swarm_service_bridge_interface | length > 0
+      - docker_swarm_service_ports is sequence
+      - docker_swarm_service_ports | length > 0
+      - docker_swarm_service_ports_by_host is mapping
+      - docker_swarm_external_service_rules_by_host is mapping
+    fail_msg: >-
+      Set ANSIBLE_DOCKER_SWARM_SERVICE_HOST_INTERFACE and
+      ANSIBLE_DOCKER_SWARM_SERVICE_PORTS before enabling Docker Swarm service
+      DOCKER-USER rules.
+  when: >
+    docker_swarm_service_allowed_source_ips | length > 0
+    or docker_swarm_external_service_rules | length > 0
+    or docker_swarm_iptables_logger_ips | length > 0
   tags:
     - docker_swarm
     - docker_swarm_iptables
+    - always
+
+- name: Resolve Docker Swarm service ports for this host
+  ansible.builtin.set_fact:
+    docker_swarm_effective_service_ports: >-
+      {{
+        docker_swarm_service_ports_by_host[docker_swarm_iptables_local_ip]
+        | default(docker_swarm_service_ports)
+      }}
+    docker_swarm_effective_external_service_rules: >-
+      {{
+        docker_swarm_external_service_rules_by_host[docker_swarm_iptables_local_ip]
+        | default(docker_swarm_external_service_rules)
+      }}
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
+
+- name: Validate Docker Swarm service source IPs
+  ansible.builtin.assert:
+    that:
+      - item is match('^([0-9]{1,3}\.){3}[0-9]{1,3}(/([0-9]|[12][0-9]|3[0-2]))?$')
+    fail_msg: "Invalid Docker Swarm service source IP entry: {{ item }}"
+  loop: "{{ docker_swarm_service_allowed_source_ips }}"
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
+
+- name: Validate Docker Swarm service ports
+  ansible.builtin.assert:
+    that:
+      - item | int >= 1
+      - item | int <= 65535
+    fail_msg: "Invalid Docker Swarm service port: {{ item }}"
+  loop: "{{ docker_swarm_effective_service_ports }}"
+  when: docker_swarm_service_allowed_source_ips | length > 0
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
+
+- name: Validate Docker Swarm external service rule structure
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.ips is defined
+      - item.ips is sequence
+      - item.ips | length > 0
+      - item.ports is defined
+      - item.ports is sequence
+      - item.ports | length > 0
+      - item.protocol | default('tcp') == 'tcp'
+    fail_msg: >-
+      Invalid Docker Swarm external service rule. Expected
+      {name, ips: [...], ports: [...], protocol: tcp}.
+  loop: "{{ docker_swarm_effective_external_service_rules }}"
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
+
+- name: Validate Docker Swarm external service IPs
+  ansible.builtin.assert:
+    that:
+      - item.1 is match('^([0-9]{1,3}\.){3}[0-9]{1,3}(/([0-9]|[12][0-9]|3[0-2]))?$')
+    fail_msg: "Invalid Docker Swarm external service IP in {{ item.0.name }}: {{ item.1 }}"
+  loop: "{{ docker_swarm_effective_external_service_rules | subelements('ips') }}"
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
+
+- name: Validate Docker Swarm external service ports
+  ansible.builtin.assert:
+    that:
+      - item.1 | int >= 1
+      - item.1 | int <= 65535
+    fail_msg: "Invalid Docker Swarm external service port in {{ item.0.name }}: {{ item.1 }}"
+  loop: "{{ docker_swarm_effective_external_service_rules | subelements('ports') }}"
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
+
+- name: Initialize Docker Swarm service DOCKER-USER rules
+  ansible.builtin.set_fact:
+    docker_swarm_allow_connect_in_rules: []
+    docker_swarm_allow_connect_out_rules: []
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
+
+- name: Add Docker Swarm allow connect in DOCKER-USER rules
+  ansible.builtin.set_fact:
+    docker_swarm_allow_connect_in_rules: >-
+      {{
+        docker_swarm_allow_connect_in_rules
+        + [
+          {
+            'chain': 'DOCKER-USER',
+            'args': [
+              '-s', item,
+              '-i', docker_swarm_service_host_interface,
+              '-o', docker_swarm_service_bridge_interface,
+              '-p', 'tcp',
+              '-m', 'multiport',
+              '--dports', docker_swarm_effective_service_ports | map('string') | join(','),
+              '-j', 'ACCEPT'
+            ]
+          },
+          {
+            'chain': 'DOCKER-USER',
+            'args': [
+              '-d', item,
+              '-o', docker_swarm_service_host_interface,
+              '-i', docker_swarm_service_bridge_interface,
+              '-p', 'tcp',
+              '-m', 'multiport',
+              '--sports', docker_swarm_effective_service_ports | map('string') | join(','),
+              '-j', 'ACCEPT'
+            ]
+          }
+        ]
+      }}
+  loop: "{{ docker_swarm_service_allowed_source_ips }}"
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
+
+- name: Add Docker Swarm allow connect out external service DOCKER-USER rules
+  ansible.builtin.set_fact:
+    docker_swarm_allow_connect_out_rules: >-
+      {{
+        docker_swarm_allow_connect_out_rules
+        + [
+          {
+            'chain': 'DOCKER-USER',
+            'args': [
+              '-s', item.1,
+              '-i', docker_swarm_service_host_interface,
+              '-o', docker_swarm_service_bridge_interface,
+              '-p', 'tcp',
+              '-m', 'multiport',
+              '--sports', item.0.ports | map('string') | join(','),
+              '-j', 'ACCEPT'
+            ]
+          },
+          {
+            'chain': 'DOCKER-USER',
+            'args': [
+              '-d', item.1,
+              '-o', docker_swarm_service_host_interface,
+              '-i', docker_swarm_service_bridge_interface,
+              '-p', 'tcp',
+              '-m', 'multiport',
+              '--dports', item.0.ports | map('string') | join(','),
+              '-j', 'ACCEPT'
+            ]
+          }
+        ]
+      }}
+  loop: "{{ docker_swarm_effective_external_service_rules | subelements('ips') }}"
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
+
+- name: Add Docker Swarm allow connect out logger DOCKER-USER rules
+  ansible.builtin.set_fact:
+    docker_swarm_allow_connect_out_rules: >-
+      {{
+        docker_swarm_allow_connect_out_rules
+        + [
+          {
+            'chain': 'DOCKER-USER',
+            'args': [
+              '-s', item,
+              '-i', docker_swarm_service_host_interface,
+              '-o', docker_swarm_service_bridge_interface,
+              '-p', 'tcp',
+              '-m', 'multiport',
+              '--sports', docker_swarm_logger_port | string,
+              '-j', 'ACCEPT'
+            ]
+          },
+          {
+            'chain': 'DOCKER-USER',
+            'args': [
+              '-d', item,
+              '-o', docker_swarm_service_host_interface,
+              '-i', docker_swarm_service_bridge_interface,
+              '-p', 'tcp',
+              '-m', 'multiport',
+              '--dports', docker_swarm_logger_port | string,
+              '-j', 'ACCEPT'
+            ]
+          }
+        ]
+      }}
+  loop: "{{ docker_swarm_iptables_logger_ips | unique }}"
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
+
+- name: Apply Docker Swarm node communication iptables rules
+  ansible.builtin.include_tasks: iptables_nodes.yml
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - docker_swarm_iptables_nodes
+
+- name: Apply Docker Swarm allow connect in DOCKER-USER rules
+  ansible.builtin.include_tasks: iptables_allow_connect_in.yml
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - docker_swarm_iptables_allow_connect_in
+
+- name: Apply Docker Swarm allow connect out DOCKER-USER rules
+  ansible.builtin.include_tasks: iptables_allow_connect_out.yml
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - docker_swarm_iptables_allow_connect_out
+
+- name: Apply Docker Swarm DOCKER-USER drop rule
+  ansible.builtin.include_tasks: iptables_docker_user_drop.yml
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - docker_swarm_iptables_docker_user_drop

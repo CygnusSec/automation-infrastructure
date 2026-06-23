@@ -47,10 +47,10 @@ env.d/90-offline-bundle.env  # online build/offline bundle settings
 
 | Tags | Env file |
 | --- | --- |
-| `base`, `prerequisite`, `docker`, `iptable`, `iptables`, `iptable_block`, `iptables_block`, `mariadb_remove` | `20-base.env` |
+| `base`, `prerequisite`, `docker`, `iptable`, `iptables`, `iptables_primary`, `iptables_zabbix`, `iptable_block`, `iptables_block`, `mariadb_remove` | `20-base.env` |
 | `hostname`, `network` | `25-host-network.env` |
 | `zabbix`, `zabbix_server`, `zabbix_agent`, `zabbix_agent_uninstall` | `30-zabbix-agent.env` |
 | `dns_time_services`, `dns_server`, `time_server`, `ntp_client` | `40-dns-time.env` |
 | `external_disk` | `50-external-disk.env` |
-| `docker_swarm`, `docker_swarm_leave`, `docker_swarm_iptables` | `60-docker-swarm.env` |
+| `docker_swarm`, `docker_swarm_leave`, `docker_swarm_iptables`, `docker_swarm_iptables_nodes`, `docker_swarm_iptables_allow_connect_in`, `docker_swarm_iptables_allow_connect_out`, `docker_swarm_iptables_docker_user_drop` | `60-docker-swarm.env` |
 | `tldh_database` | `70-tldh-database.env` |

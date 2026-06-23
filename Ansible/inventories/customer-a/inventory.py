@@ -78,6 +78,7 @@ def build_inventory():
     cache_ext_tags = csv_env("ANSIBLE_SWARM_CACHE_SERVER_EXT_TAGS")
     cache_int_hosts = csv_env("ANSIBLE_SWARM_CACHE_SERVER_INT_HOSTS")
     cache_int_tags = csv_env("ANSIBLE_SWARM_CACHE_SERVER_INT_TAGS")
+    logger_hosts = set(csv_env("ANSIBLE_SWARM_LOGGER_HOSTS"))
     ssh_extra_hosts = csv_env("ANSIBLE_SSH_COPY_ID_EXTRA_HOSTS")
     iptables_hosts = csv_env("ANSIBLE_IPTABLES_HOSTS")
     zabbix_server_hosts = csv_env("ANSIBLE_ZABBIX_SERVER_HOSTS")
@@ -101,8 +102,15 @@ def build_inventory():
     if cache_int_tags and len(cache_int_tags) != len(cache_int_hosts):
         warn("ANSIBLE_SWARM_CACHE_SERVER_INT_TAGS count does not match ANSIBLE_SWARM_CACHE_SERVER_INT_HOSTS")
 
+    def node_labels(ip, default_tag=None):
+        if ip in logger_hosts:
+            return {"node_tag": "logger"}
+        if default_tag:
+            return {"node_tag": default_tag}
+        return None
+
     for index, ip in enumerate(manager_hosts, start=1):
-        add_host(inventory, "swarm_managers", f"swarm-manager-{index:02d}", ip)
+        add_host(inventory, "swarm_managers", f"swarm-manager-{index:02d}", ip, node_labels(ip))
 
     for ip in backend_hosts:
         add_host(
@@ -110,7 +118,7 @@ def build_inventory():
             "swarm_backend_workers",
             host_alias("backend", ip),
             ip,
-            {"node_tag": "backend"},
+            node_labels(ip, "backend"),
         )
 
     for ip in file_server_hosts:
@@ -119,16 +127,16 @@ def build_inventory():
             "swarm_file_server_workers",
             host_alias("file-server", ip),
             ip,
-            {"node_tag": "file-server"},
+            node_labels(ip, "file-server"),
         )
 
     for index, ip in enumerate(cache_ext_hosts, start=1):
         tag = cache_ext_tags[index - 1] if index <= len(cache_ext_tags) else f"cache-server-ext-{index:02d}"
-        add_host(inventory, "swarm_cache_ext_workers", tag, ip, {"node_tag": tag})
+        add_host(inventory, "swarm_cache_ext_workers", tag, ip, node_labels(ip, tag))
 
     for index, ip in enumerate(cache_int_hosts, start=1):
         tag = cache_int_tags[index - 1] if index <= len(cache_int_tags) else f"cache-server-int-{index:02d}"
-        add_host(inventory, "swarm_cache_int_workers", tag, ip, {"node_tag": tag})
+        add_host(inventory, "swarm_cache_int_workers", tag, ip, node_labels(ip, tag))
 
     for ip in ssh_extra_hosts:
         add_host(inventory, "ssh_copy_id_extra_targets", host_alias("ssh-target", ip), ip, advertise=False)

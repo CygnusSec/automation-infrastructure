@@ -247,5 +247,13 @@
       when: docker_swarm_manage_iptables | bool
       tags:
         - docker_swarm_iptables
+        - docker_swarm_iptables_nodes
+        - docker_swarm_iptables_allow_connect_in
+        - docker_swarm_iptables_allow_connect_out
+        - docker_swarm_iptables_docker_user_drop
   tags:
     - docker_swarm_iptables
+    - docker_swarm_iptables_nodes
+    - docker_swarm_iptables_allow_connect_in
+    - docker_swarm_iptables_allow_connect_out
+    - docker_swarm_iptables_docker_user_drop

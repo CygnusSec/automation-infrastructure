@@ -10,13 +10,15 @@ group.
 - allows established output connections
 - allows new and established SSH input from `ANSIBLE_IPTABLES_SSH_WHITELIST_IPS`
 - allows established SSH output back to `ANSIBLE_IPTABLES_SSH_WHITELIST_IPS`
-- allows configured source IPs to reach services on the host through `INPUT`
-  and allows response traffic through `OUTPUT`
-- allows outbound traffic from the host to configured external service IP and
-  port lists through `OUTPUT`, plus response traffic through `INPUT`
+- allows optional non-Swarm source IP exceptions through `INPUT` and response
+  traffic through `OUTPUT`
+- allows optional non-Swarm external service IP/port lists through `OUTPUT`,
+  plus response traffic through `INPUT`
 - allows custom per-IP port lists from `ANSIBLE_IPTABLES_IP_PORT_RULES`
 - allows Zabbix server IPs to poll agents on `10050/tcp`
 - allows active Zabbix agents to connect to the server on `10051/tcp`
+- on the Zabbix server host, opens only polling traffic to agents on
+  `10050/tcp`
 - allows DNS client/server traffic on `53/tcp` and `53/udp`
 - allows time/NTP client/server traffic on `123/udp`
 - optionally blocks `INPUT` and `OUTPUT` as a separate `iptables_block` task
@@ -41,8 +43,9 @@ ANSIBLE_IPTABLES_RESET_ENABLED=true
 ANSIBLE_IPTABLES_RESET_CHAINS="[INPUT, OUTPUT]"
 ANSIBLE_IPTABLES_SSH_WHITELIST_IPS="172.16.3.21,172.16.3.22"
 ANSIBLE_IPTABLES_SSH_PORT=22
-ANSIBLE_IPTABLES_SERVICE_ALLOWED_SOURCE_IPS="[172.16.3.97, 172.16.3.98]"
-ANSIBLE_IPTABLES_EXTERNAL_SERVICE_RULES="[{name: database, ips: [172.16.4.2], ports: [3306]}]"
+ANSIBLE_IPTABLES_SERVICE_ALLOWED_SOURCE_IPS="[]"
+ANSIBLE_IPTABLES_EXTERNAL_SERVICE_RULES="[]"
+ANSIBLE_IPTABLES_INBOUND_SERVICE_RULES="[{name: database_in, target_ips: [172.16.4.11, 172.16.4.12], source_ips: [172.16.3.21, 172.16.3.22], ports: [3306]}]"
 ANSIBLE_IPTABLES_IP_PORT_RULES="[{ip: 172.16.5.100, ports: [80, 443]}, {ip: 172.16.5.102, ports: [8080]}, {ip: 172.16.5.103, ports: []}]"
 ANSIBLE_IPTABLES_ZABBIX_SERVER_IPS="[172.16.5.57]"
 ANSIBLE_IPTABLES_ZABBIX_AGENT_PORT=10050
@@ -62,13 +65,21 @@ addresses or CIDRs.
 policy to `ACCEPT`, flush old rules from `ANSIBLE_IPTABLES_RESET_CHAINS`, then
 apply the new rules.
 
-`ANSIBLE_IPTABLES_SERVICE_ALLOWED_SOURCE_IPS` is a YAML list of IPv4 addresses
-or CIDRs that may connect to services on the target hosts.
+`ANSIBLE_IPTABLES_SERVICE_ALLOWED_SOURCE_IPS` is kept for non-Swarm host
+service exceptions. Published Docker Swarm service source IPs should be set in
+`ANSIBLE_DOCKER_SWARM_SERVICE_ALLOWED_SOURCE_IPS` so they are written to
+`DOCKER-USER`.
 
 `ANSIBLE_IPTABLES_EXTERNAL_SERVICE_RULES` is a YAML list of service definitions.
 Each item supports `name`, `ips`, `ports`, and optional `protocol` (`tcp` by
-default). The role writes these as `INPUT` and `OUTPUT` rules, not Docker
-`DOCKER-USER` rules.
+default). Use it only for non-Swarm host traffic. Swarm container external
+service traffic should be set in `ANSIBLE_DOCKER_SWARM_EXTERNAL_SERVICE_RULES`
+so it is written to `DOCKER-USER`.
+
+`ANSIBLE_IPTABLES_INBOUND_SERVICE_RULES` is a YAML list for services hosted on
+the current target. A rule applies only when the host IP is in `target_ips`,
+then allows `source_ips` to connect to `ports` and allows matching response
+traffic back out.
 
 `ANSIBLE_IPTABLES_IP_PORT_RULES` is a YAML list of per-IP allow rules. Each item
 supports `ip`, `ports`, and optional `protocol` (`tcp` by default). Entries with

@@ -1,0 +1,84 @@
+---
+- name: Remove stale iptables SSH input whitelist rules before primary allow
+  ansible.builtin.command:
+    argv:
+      - iptables
+      - -D
+      - INPUT
+      - -s
+      - "{{ item }}"
+      - -p
+      - tcp
+      - --dport
+      - "{{ iptables_ssh_port | string }}"
+      - -m
+      - conntrack
+      - --ctstate
+      - NEW,ESTABLISHED
+      - -j
+      - ACCEPT
+  register: iptables_primary_ssh_input_rule_delete
+  changed_when: iptables_primary_ssh_input_rule_delete.rc == 0
+  failed_when: false
+  loop: "{{ iptables_ssh_whitelist_ips }}"
+  tags:
+    - iptables
+    - iptables_primary
+
+- name: Remove stale iptables SSH output whitelist rules before primary allow
+  ansible.builtin.command:
+    argv:
+      - iptables
+      - -D
+      - OUTPUT
+      - -d
+      - "{{ item }}"
+      - -p
+      - tcp
+      - --sport
+      - "{{ iptables_ssh_port | string }}"
+      - -m
+      - conntrack
+      - --ctstate
+      - ESTABLISHED
+      - -j
+      - ACCEPT
+  register: iptables_primary_ssh_output_rule_delete
+  changed_when: iptables_primary_ssh_output_rule_delete.rc == 0
+  failed_when: false
+  loop: "{{ iptables_ssh_whitelist_ips }}"
+  tags:
+    - iptables
+    - iptables_primary
+
+- name: Remove existing primary iptables traffic rules before reinserting
+  ansible.builtin.command:
+    argv: "{{ ['iptables', '-D', item.chain] + item.args }}"
+  register: iptables_primary_rule_delete
+  changed_when: iptables_primary_rule_delete.rc == 0
+  failed_when: false
+  loop: "{{ iptables_primary_rules }}"
+  tags:
+    - iptables
+    - iptables_primary
+
+- name: Check primary iptables traffic rules
+  ansible.builtin.command:
+    argv: "{{ ['iptables', '-C', item.chain] + item.args }}"
+  register: iptables_primary_rule_check
+  changed_when: false
+  failed_when: false
+  loop: "{{ iptables_primary_rules }}"
+  tags:
+    - iptables
+    - iptables_primary
+
+- name: Allow primary iptables traffic
+  ansible.builtin.command:
+    argv: "{{ ['iptables', '-I', item.item.chain] + item.item.args }}"
+  changed_when: true
+  loop: "{{ iptables_primary_rule_check.results }}"
+  when: item.rc != 0
+  tags:
+    - iptables
+    - iptables_primary

@@ -48,6 +48,7 @@ Ansible/inventories/*/secrets/*
 !Ansible/inventories/*/secrets/auth.yaml.example
 Ansible/README.md.bk
 Ansible/docs/Operations.md
+*/output/*
 
 # Local environment files
 .env

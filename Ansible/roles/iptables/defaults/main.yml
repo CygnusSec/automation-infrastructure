@@ -9,6 +9,7 @@ iptables_ssh_whitelist_ips_raw: ""
 iptables_ssh_port: 22
 iptables_service_allowed_source_ips: []
 iptables_external_service_rules: []
+iptables_inbound_service_rules: []
 iptables_ip_port_rules: []
 iptables_zabbix_server_ips: []
 iptables_zabbix_agent_port: 10050
