@@ -1,0 +1,70 @@
+---
+- name: Check netfilter-persistent restore plugins
+  ansible.builtin.stat:
+    path: "{{ item.path }}"
+  register: iptables_persistent_plugin_checks
+  loop:
+    - name: ipset
+      path: /usr/share/netfilter-persistent/plugins.d/10-ipset
+      enabled: "{{ iptables_ipset_persist | bool }}"
+    - name: ip4tables
+      path: /usr/share/netfilter-persistent/plugins.d/15-ip4tables
+      enabled: "{{ iptables_persist | bool }}"
+  when: item.enabled | bool
+  tags:
+    - iptables
+    - iptables_primary
+    - iptables_zabbix
+    - iptables_ipsets
+    - iptable_block
+    - iptables_block
+    - iptables_save
+
+- name: Validate netfilter-persistent restore plugins
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+    fail_msg: >-
+      Missing netfilter-persistent {{ item.item.name }} plugin:
+      {{ item.item.path }}. Install ipset-persistent and
+      iptables-persistent before saving persistent firewall rules.
+  loop: "{{ iptables_persistent_plugin_checks.results | default([]) }}"
+  when: item.item.enabled | bool
+  tags:
+    - iptables
+    - iptables_primary
+    - iptables_zabbix
+    - iptables_ipsets
+    - iptable_block
+    - iptables_block
+    - iptables_save
+
+- name: Save common ipsets for netfilter-persistent
+  ansible.builtin.shell: "ipset save > {{ iptables_ipset_save_path | quote }}"
+  args:
+    executable: /bin/bash
+  changed_when: true
+  when: iptables_ipset_persist | bool
+  tags:
+    - iptables
+    - iptables_primary
+    - iptables_zabbix
+    - iptables_ipsets
+    - iptable_block
+    - iptables_block
+    - iptables_save
+
+- name: Save common iptables rules for netfilter-persistent
+  ansible.builtin.shell: "iptables-save > {{ iptables_save_path | quote }}"
+  args:
+    executable: /bin/bash
+  changed_when: true
+  when: iptables_persist | bool
+  tags:
+    - iptables
+    - iptables_primary
+    - iptables_zabbix
+    - iptables_ipsets
+    - iptable_block
+    - iptables_block
+    - iptables_save

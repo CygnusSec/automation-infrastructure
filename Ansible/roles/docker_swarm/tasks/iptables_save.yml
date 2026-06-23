@@ -1,0 +1,70 @@
+---
+- name: Check netfilter-persistent restore plugins for Docker Swarm rules
+  ansible.builtin.stat:
+    path: "{{ item.path }}"
+  register: docker_swarm_persistent_plugin_checks
+  loop:
+    - name: ipset
+      path: /usr/share/netfilter-persistent/plugins.d/10-ipset
+      enabled: "{{ docker_swarm_ipset_persist | bool }}"
+    - name: ip4tables
+      path: /usr/share/netfilter-persistent/plugins.d/15-ip4tables
+      enabled: "{{ docker_swarm_iptables_persist | bool }}"
+  when: item.enabled | bool
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - docker_swarm_iptables_ipsets
+    - docker_swarm_iptables_nodes
+    - docker_swarm_iptables_allow_connect_in
+    - docker_swarm_iptables_allow_connect_out
+    - docker_swarm_iptables_docker_user_drop
+    - docker_swarm_iptables_save
+
+- name: Validate netfilter-persistent restore plugins for Docker Swarm rules
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+    fail_msg: >-
+      Missing netfilter-persistent {{ item.item.name }} plugin:
+      {{ item.item.path }}. Install ipset-persistent and
+      iptables-persistent before saving persistent Docker Swarm firewall rules.
+  loop: "{{ docker_swarm_persistent_plugin_checks.results | default([]) }}"
+  when: item.item.enabled | bool
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - docker_swarm_iptables_ipsets
+    - docker_swarm_iptables_nodes
+    - docker_swarm_iptables_allow_connect_in
+    - docker_swarm_iptables_allow_connect_out
+    - docker_swarm_iptables_docker_user_drop
+    - docker_swarm_iptables_save
+
+- name: Save Docker Swarm ipsets for netfilter-persistent
+  ansible.builtin.shell: "ipset save > {{ docker_swarm_ipset_save_path | quote }}"
+  args:
+    executable: /bin/bash
+  changed_when: true
+  when: docker_swarm_ipset_persist | bool
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - docker_swarm_iptables_ipsets
+    - docker_swarm_iptables_save
+
+- name: Save Docker Swarm iptables rules for netfilter-persistent
+  ansible.builtin.shell: "iptables-save > {{ docker_swarm_iptables_save_path | quote }}"
+  args:
+    executable: /bin/bash
+  changed_when: true
+  when: docker_swarm_iptables_persist | bool
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - docker_swarm_iptables_ipsets
+    - docker_swarm_iptables_nodes
+    - docker_swarm_iptables_allow_connect_in
+    - docker_swarm_iptables_allow_connect_out
+    - docker_swarm_iptables_docker_user_drop
+    - docker_swarm_iptables_save

@@ -30,9 +30,11 @@ Run Docker Swarm iptables sub-tasks separately:
 
 ```bash
 ./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_nodes
+./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_ipsets
 ./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_allow_connect_in
 ./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_allow_connect_out
 ./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_docker_user_drop
+./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_save
 ```
 
 Inventory example:
@@ -69,6 +71,18 @@ docker_swarm_force_reset: false
 docker_swarm_leave_force: true
 docker_swarm_manage_iptables: true
 docker_swarm_manage_encrypted_overlay_esp: true
+docker_swarm_manage_ipsets: true
+docker_swarm_ipset_persist: true
+docker_swarm_ipset_save_path: /etc/iptables/ipsets
+docker_swarm_iptables_persist: true
+docker_swarm_iptables_save_path: /etc/iptables/rules.v4
+docker_swarm_ipset_managers_name: swarm_managers
+docker_swarm_ipset_nodes_name: swarm_nodes
+docker_swarm_ipset_service_clients_name: app_clients
+docker_swarm_ipset_logger_name: syslog_nodes
+docker_swarm_external_service_ipset_names:
+  database: mysql_nodes
+  storage: minio_nodes
 docker_swarm_service_allowed_source_ips:
   - 172.16.3.98
   - 172.16.3.99
@@ -104,9 +118,8 @@ docker_swarm_logger_protocols:
   - udp
 ```
 
-The iptables task builds peer IPs from `swarm_managers` and `swarm_workers`,
-skips each node's own IP, and opens the Swarm rules used by the legacy
-`allow_swarm` shell function:
+The iptables task builds ipsets from `swarm_managers` and `swarm_workers`, then
+opens Swarm traffic by matching those sets:
 
 - manager join traffic on `2377/tcp`
 - node discovery on `7946/tcp` and `7946/udp`
@@ -115,7 +128,8 @@ skips each node's own IP, and opens the Swarm rules used by the legacy
 
 Service source IPs for published Swarm services and Swarm container access to
 external services are handled by this role in `DOCKER-USER`, between the host
-interface and `docker_gwbridge`.
+interface and `docker_gwbridge`. The role inserts `ESTABLISHED,RELATED` rules,
+so it avoids duplicate reverse `--sports` rules.
 `docker_swarm_service_ports_by_host` overrides `docker_swarm_service_ports` on
 matching node IPs.
 `docker_swarm_external_service_rules_by_host` overrides
@@ -127,6 +141,13 @@ traffic to reach logger node IPs on `docker_swarm_logger_port`.
 When `docker_swarm_docker_user_drop_enabled: true`, the role appends
 `iptables -A DOCKER-USER -j DROP` after allow rules and removes Docker's
 default `iptables -D DOCKER-USER -j RETURN` first.
+When `docker_swarm_ipset_persist: true`, the role saves ipsets to
+`/etc/iptables/ipsets`. When `docker_swarm_iptables_persist: true`, it also
+saves the final iptables state to `/etc/iptables/rules.v4`, so
+`netfilter-persistent` restores the rules after reboot.
+The save task checks that netfilter-persistent has `10-ipset` and
+`15-ip4tables`, so ipsets are restored before iptables rules that reference
+them.
 
 Node labels can be applied by inventory group:
 

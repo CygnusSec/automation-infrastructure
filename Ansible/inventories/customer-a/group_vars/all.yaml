@@ -11,8 +11,12 @@ prerequisite_packages:
   - ca-certificates
   - curl
   - gnupg
+  - ipset
+  - ipset-persistent
+  - iptables-persistent
   - lsb-release
   - net-tools
+  - netfilter-persistent
   - openssh-client
   - python3
   - python3-apt
@@ -59,6 +63,18 @@ iptables_enabled: "{{ (lookup('env', 'ANSIBLE_IPTABLES_ENABLED') | default('fals
 iptables_target_group: "{{ lookup('env', 'ANSIBLE_IPTABLES_TARGET_GROUP') | default('iptables_targets', true) }}"
 iptables_reset_enabled: "{{ (lookup('env', 'ANSIBLE_IPTABLES_RESET_ENABLED') | default('true', true)) | bool }}"
 iptables_reset_chains: "{{ lookup('env', 'ANSIBLE_IPTABLES_RESET_CHAINS') | default('[INPUT, OUTPUT]', true) | from_yaml }}"
+iptables_manage_ipsets: "{{ (lookup('env', 'ANSIBLE_IPTABLES_MANAGE_IPSETS') | default('true', true)) | bool }}"
+iptables_ipset_persist: "{{ (lookup('env', 'ANSIBLE_IPTABLES_IPSET_PERSIST') | default('true', true)) | bool }}"
+iptables_ipset_save_path: "{{ lookup('env', 'ANSIBLE_IPTABLES_IPSET_SAVE_PATH') | default('/etc/iptables/ipsets', true) }}"
+iptables_persist: "{{ (lookup('env', 'ANSIBLE_IPTABLES_PERSIST') | default('true', true)) | bool }}"
+iptables_save_path: "{{ lookup('env', 'ANSIBLE_IPTABLES_SAVE_PATH') | default('/etc/iptables/rules.v4', true) }}"
+iptables_ipset_prefix: "{{ lookup('env', 'ANSIBLE_IPTABLES_IPSET_PREFIX') | default('common', true) }}"
+iptables_ipset_ssh_sources_name: "{{ lookup('env', 'ANSIBLE_IPTABLES_IPSET_SSH_SOURCES_NAME') | default('common_ssh_sources', true) }}"
+iptables_ipset_service_sources_name: "{{ lookup('env', 'ANSIBLE_IPTABLES_IPSET_SERVICE_SOURCES_NAME') | default('common_service_sources', true) }}"
+iptables_ipset_dns_time_servers_name: "{{ lookup('env', 'ANSIBLE_IPTABLES_IPSET_DNS_TIME_SERVERS_NAME') | default('common_dns_time_servers', true) }}"
+iptables_ipset_dns_time_clients_name: "{{ lookup('env', 'ANSIBLE_IPTABLES_IPSET_DNS_TIME_CLIENTS_NAME') | default('common_dns_time_clients', true) }}"
+iptables_ipset_zabbix_servers_name: "{{ lookup('env', 'ANSIBLE_IPTABLES_IPSET_ZABBIX_SERVERS_NAME') | default('common_zabbix_servers', true) }}"
+iptables_ipset_zabbix_agents_name: "{{ lookup('env', 'ANSIBLE_IPTABLES_IPSET_ZABBIX_AGENTS_NAME') | default('common_zabbix_agents', true) }}"
 iptables_ssh_whitelist_ips_raw: "{{ lookup('env', 'ANSIBLE_IPTABLES_SSH_WHITELIST_IPS') | default('', true) }}"
 iptables_ssh_port: "{{ (lookup('env', 'ANSIBLE_IPTABLES_SSH_PORT') | default('22', true)) | int }}"
 iptables_service_allowed_source_ips: "{{ lookup('env', 'ANSIBLE_IPTABLES_SERVICE_ALLOWED_SOURCE_IPS') | default('[]', true) | from_yaml }}"
@@ -73,7 +89,7 @@ iptables_dns_time_client_sources: "{{ lookup('env', 'ANSIBLE_IPTABLES_DNS_TIME_C
 iptables_dns_port: "{{ (lookup('env', 'ANSIBLE_IPTABLES_DNS_PORT') | default('53', true)) | int }}"
 iptables_time_port: "{{ (lookup('env', 'ANSIBLE_IPTABLES_TIME_PORT') | default('123', true)) | int }}"
 iptables_block_enabled: "{{ (lookup('env', 'ANSIBLE_IPTABLES_BLOCK_ENABLED') | default('false', true)) | bool }}"
-iptables_block_chains: "{{ lookup('env', 'ANSIBLE_IPTABLES_BLOCK_CHAINS') | default('[INPUT, OUTPUT]', true) | from_yaml }}"
+iptables_block_chains: "{{ lookup('env', 'ANSIBLE_IPTABLES_BLOCK_CHAINS') | default('[INPUT, FORWARD, OUTPUT]', true) | from_yaml }}"
 
 # SSH bootstrap.
 ssh_copy_id_public_key_file: "{{ lookup('env', 'ANSIBLE_SSH_COPY_ID_PUBLIC_KEY_FILE') | default(ansible_ssh_private_key_file ~ '.pub', true) }}"
@@ -197,6 +213,17 @@ docker_swarm_leave_force: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_LEAVE_FORCE')
 docker_swarm_manager_addr: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_MANAGER_ADDR') | default('', true) }}"
 docker_swarm_manage_iptables: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_MANAGE_IPTABLES') | default('false', true)) | bool }}"
 docker_swarm_manage_encrypted_overlay_esp: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_MANAGE_ENCRYPTED_OVERLAY_ESP') | default('false', true)) | bool }}"
+docker_swarm_manage_ipsets: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_MANAGE_IPSETS') | default('true', true)) | bool }}"
+docker_swarm_ipset_persist: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_IPSET_PERSIST') | default('true', true)) | bool }}"
+docker_swarm_ipset_save_path: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_IPSET_SAVE_PATH') | default('/etc/iptables/ipsets', true) }}"
+docker_swarm_iptables_persist: "{{ (lookup('env', 'ANSIBLE_DOCKER_SWARM_IPTABLES_PERSIST') | default('true', true)) | bool }}"
+docker_swarm_iptables_save_path: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_IPTABLES_SAVE_PATH') | default('/etc/iptables/rules.v4', true) }}"
+docker_swarm_ipset_prefix: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_IPSET_PREFIX') | default('swarm', true) }}"
+docker_swarm_ipset_managers_name: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_IPSET_MANAGERS_NAME') | default('swarm_managers', true) }}"
+docker_swarm_ipset_nodes_name: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_IPSET_NODES_NAME') | default('swarm_nodes', true) }}"
+docker_swarm_ipset_service_clients_name: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_IPSET_SERVICE_CLIENTS_NAME') | default('app_clients', true) }}"
+docker_swarm_ipset_logger_name: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_IPSET_LOGGER_NAME') | default('syslog_nodes', true) }}"
+docker_swarm_external_service_ipset_names: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_EXTERNAL_SERVICE_IPSET_NAMES') | default('{database: mysql_nodes, storage: minio_nodes}', true) | from_yaml }}"
 docker_swarm_service_allowed_source_ips: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_SERVICE_ALLOWED_SOURCE_IPS') | default('[]', true) | from_yaml }}"
 docker_swarm_service_host_interface: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_SERVICE_HOST_INTERFACE') | default(network_interface, true) }}"
 docker_swarm_service_bridge_interface: "{{ lookup('env', 'ANSIBLE_DOCKER_SWARM_SERVICE_BRIDGE_INTERFACE') | default('docker_gwbridge', true) }}"

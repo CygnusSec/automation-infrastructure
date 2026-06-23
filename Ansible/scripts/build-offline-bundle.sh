@@ -21,6 +21,10 @@ ANSIBLE_DNS_SERVER_IMAGE="${ANSIBLE_DNS_SERVER_IMAGE:-local/bind9:offline}"
 ANSIBLE_DNS_SERVER_IMAGE_TAR="${ANSIBLE_DNS_SERVER_IMAGE_TAR:-./repo/docker-images/bind9.tar}"
 ANSIBLE_TIME_SERVER_IMAGE="${ANSIBLE_TIME_SERVER_IMAGE:-local/chrony:offline}"
 ANSIBLE_TIME_SERVER_IMAGE_TAR="${ANSIBLE_TIME_SERVER_IMAGE_TAR:-./repo/docker-images/chrony.tar}"
+ANSIBLE_PREREQUISITE_DOWNLOAD_PACKAGES="${ANSIBLE_PREREQUISITE_DOWNLOAD_PACKAGES:-true}"
+ANSIBLE_PREREQUISITE_DOWNLOAD_IMAGE="${ANSIBLE_PREREQUISITE_DOWNLOAD_IMAGE:-ubuntu:24.04}"
+ANSIBLE_PREREQUISITE_REPO_SOURCE="${ANSIBLE_PREREQUISITE_REPO_SOURCE:-./repo/prerequisite}"
+ANSIBLE_PREREQUISITE_OFFLINE_PACKAGES="${ANSIBLE_PREREQUISITE_OFFLINE_PACKAGES:-apt-transport-https ca-certificates curl gnupg ipset ipset-persistent iptables-persistent lsb-release net-tools netfilter-persistent openssh-client python3 python3-apt python3-pip rsync sshpass telnet traceroute unzip vim wget}"
 ANSIBLE_ZABBIX_AGENT_DOWNLOAD_PACKAGES="${ANSIBLE_ZABBIX_AGENT_DOWNLOAD_PACKAGES:-true}"
 ANSIBLE_ZABBIX_AGENT_DOWNLOAD_IMAGE="${ANSIBLE_ZABBIX_AGENT_DOWNLOAD_IMAGE:-ubuntu:24.04}"
 ANSIBLE_ZABBIX_AGENT_REPO_SOURCE="${ANSIBLE_ZABBIX_AGENT_REPO_SOURCE:-./repo/zabbix}"
@@ -74,6 +78,36 @@ build_service_image() {
   docker save "${image}" -o "${tar_path}"
 }
 
+download_ubuntu_packages() {
+  local repo_dir="$1"
+  local packages="$2"
+  local label="$3"
+
+  mkdir -p "${repo_dir}"
+
+  echo "Downloading ${label} offline packages into: ${repo_dir}"
+  docker run --rm \
+    --tmpfs /tmp:exec,mode=1777 \
+    --tmpfs /var/lib/apt/lists:exec,mode=755 \
+    --tmpfs /var/cache/apt:exec,mode=755 \
+    -e "OFFLINE_PACKAGES=${packages}" \
+    -v "${repo_dir}:/offline-debs" \
+    "${ANSIBLE_PREREQUISITE_DOWNLOAD_IMAGE}" \
+    bash -lc '
+      set -euo pipefail
+      export DEBIAN_FRONTEND=noninteractive
+      chmod 1777 /tmp
+      rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+      apt-get -o Acquire::Retries=5 update
+      mkdir -p /offline-debs/partial
+      apt-get install -y --download-only --no-install-recommends \
+        -o Acquire::Retries=5 \
+        -o Dir::Cache::archives=/offline-debs \
+        ${OFFLINE_PACKAGES}
+      find /offline-debs -maxdepth 1 -type f -name "*.deb" -print | sort
+    '
+}
+
 download_zabbix_packages() {
   local repo_dir="$1"
   local release_url="$2"
@@ -110,6 +144,13 @@ download_zabbix_packages() {
       find /zabbix-debs -maxdepth 1 -type f -name "*.deb" -print | sort
     '
 }
+
+if [[ "${ANSIBLE_PREREQUISITE_DOWNLOAD_PACKAGES}" == "true" ]]; then
+  download_ubuntu_packages \
+    "$(project_path "${ANSIBLE_PREREQUISITE_REPO_SOURCE}")" \
+    "${ANSIBLE_PREREQUISITE_OFFLINE_PACKAGES}" \
+    "prerequisite"
+fi
 
 if [[ "${ANSIBLE_ZABBIX_AGENT_DOWNLOAD_PACKAGES}" == "true" ]]; then
   download_zabbix_packages \

@@ -2,7 +2,7 @@
 
 Configures common iptables ACCEPT rules for loopback traffic, established
 connections, SSH from a configured whitelist, DNS/time, Zabbix, and optional
-non-Swarm host service exceptions.
+non-Swarm host service rules with explicit source IPs and ports.
 
 Set values in `env.d/20-base.env`:
 
@@ -11,6 +11,12 @@ ANSIBLE_IPTABLES_ENABLED=true
 ANSIBLE_IPTABLES_TARGET_GROUP=iptables_targets
 ANSIBLE_IPTABLES_RESET_ENABLED=true
 ANSIBLE_IPTABLES_RESET_CHAINS="[INPUT, OUTPUT]"
+ANSIBLE_IPTABLES_MANAGE_IPSETS=true
+ANSIBLE_IPTABLES_IPSET_PERSIST=true
+ANSIBLE_IPTABLES_IPSET_SAVE_PATH=/etc/iptables/ipsets
+ANSIBLE_IPTABLES_PERSIST=true
+ANSIBLE_IPTABLES_SAVE_PATH=/etc/iptables/rules.v4
+ANSIBLE_IPTABLES_IPSET_PREFIX=common
 ANSIBLE_IPTABLES_SSH_WHITELIST_IPS="172.16.3.21,172.16.3.22"
 ANSIBLE_IPTABLES_SSH_PORT=22
 ANSIBLE_IPTABLES_SERVICE_ALLOWED_SOURCE_IPS="[]"
@@ -25,7 +31,7 @@ ANSIBLE_IPTABLES_DNS_TIME_CLIENT_SOURCES="[]"
 ANSIBLE_IPTABLES_DNS_PORT=53
 ANSIBLE_IPTABLES_TIME_PORT=123
 ANSIBLE_IPTABLES_BLOCK_ENABLED=false
-ANSIBLE_IPTABLES_BLOCK_CHAINS="[INPUT, OUTPUT]"
+ANSIBLE_IPTABLES_BLOCK_CHAINS="[INPUT, FORWARD, OUTPUT]"
 ```
 
 Set the target hosts in `env.d/10-inventory.env`:
@@ -41,7 +47,7 @@ Run only this role:
 ```
 
 Run only primary allow rules (`lo`, established traffic, SSH, DNS/time, and
-non-Swarm service exceptions such as `443`):
+non-Swarm service rules such as `443`):
 
 ```bash
 ./scripts/run-ansible.sh deploy --tags iptables_primary
@@ -53,13 +59,20 @@ Run only Zabbix allow rules:
 ./scripts/run-ansible.sh deploy --tags iptables_zabbix
 ```
 
+Save the current ipset and iptables state only:
+
+```bash
+./scripts/run-ansible.sh deploy --tags iptables_save
+```
+
 The singular alias also works:
 
 ```bash
 ./scripts/run-ansible.sh deploy --tags iptable
 ```
 
-Block `INPUT` and `OUTPUT` as a separate task after allow rules are in place:
+Block `INPUT`, `FORWARD`, and `OUTPUT` as a separate task after allow rules are
+in place:
 
 ```bash
 ./scripts/run-ansible.sh deploy --tags iptables_block
@@ -82,6 +95,10 @@ old rules from those chains, then applies the configured rules. Set
 Docker Swarm peer rules, published service source IPs, and Swarm container
 external service rules remain in the separate `docker_swarm_iptables` task.
 
+Keep `ANSIBLE_IPTABLES_SERVICE_ALLOWED_SOURCE_IPS=[]` in DROP mode. Non-empty
+values are rejected because that legacy variable would create broad host-level
+allow rules without explicit ports.
+
 On agent hosts, Zabbix rules allow the server to poll agents on `10050/tcp`
 and allow active agents to connect back to the server on `10051/tcp`. On the
 Zabbix server host, the role only opens polling traffic to agent hosts on
@@ -90,6 +107,9 @@ Zabbix server host, the role only opens polling traffic to agent hosts on
 DNS/time rules allow clients to reach DNS servers on `53/tcp` and `53/udp`,
 and time servers on `123/udp`. They also allow local hosts to query the
 configured DNS/time server IPs.
+When `ANSIBLE_IPTABLES_DNS_TIME_CLIENT_SOURCES=[]`, DNS/time server hosts allow
+all hosts in `ANSIBLE_IPTABLES_TARGET_GROUP` to connect to those DNS/time
+ports. Set this variable to a YAML list of source IPs/CIDRs to restrict access.
 
 `ANSIBLE_IPTABLES_IP_PORT_RULES` allows per-IP port lists. Entries with
 `ports: []` are skipped until ports are filled in `env.d/20-base.env`.
@@ -97,3 +117,16 @@ configured DNS/time server IPs.
 `ANSIBLE_IPTABLES_INBOUND_SERVICE_RULES` applies only on hosts whose IP is in
 `target_ips`. It allows `source_ips` to connect to the configured `ports` and
 adds the matching response `OUTPUT` rules.
+
+When `ANSIBLE_IPTABLES_MANAGE_IPSETS=true`, the role creates common ipsets for
+SSH sources, DNS/time servers, Zabbix servers/agents, and configured service
+groups, then writes iptables rules with `-m set --match-set`. The role saves the
+sets to `/etc/iptables/ipsets` when `ANSIBLE_IPTABLES_IPSET_PERSIST=true`.
+
+When `ANSIBLE_IPTABLES_PERSIST=true`, the role also runs `iptables-save` to
+write `/etc/iptables/rules.v4`. With `ipset-persistent`,
+`iptables-persistent`, and `netfilter-persistent` installed, the saved ipsets
+and iptables rules are restored after reboot.
+The save task checks that netfilter-persistent has `10-ipset` and
+`15-ip4tables`, so ipsets are restored before iptables rules that reference
+them.

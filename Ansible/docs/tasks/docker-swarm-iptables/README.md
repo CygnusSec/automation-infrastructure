@@ -1,9 +1,9 @@
 # Docker Swarm iptables
 
 This task configures iptables rules for Swarm manager join traffic, node
-discovery, and overlay networking. It builds peer IPs from the configured
-`swarm_managers` and `swarm_workers` inventory groups and skips each node's own
-IP, matching the behavior of the legacy `allow_swarm` shell function.
+discovery, and overlay networking. It uses `ipset` to group Swarm nodes,
+manager nodes, service clients, and external service backends so iptables does
+not need one rule per IP.
 
 It is separated from the main Swarm task. Running `--tags docker_swarm` does not
 run iptables management.
@@ -13,6 +13,16 @@ run iptables management.
 ```env
 ANSIBLE_DOCKER_SWARM_MANAGE_IPTABLES=true
 ANSIBLE_DOCKER_SWARM_MANAGE_ENCRYPTED_OVERLAY_ESP=true
+ANSIBLE_DOCKER_SWARM_MANAGE_IPSETS=true
+ANSIBLE_DOCKER_SWARM_IPSET_PERSIST=true
+ANSIBLE_DOCKER_SWARM_IPSET_SAVE_PATH=/etc/iptables/ipsets
+ANSIBLE_DOCKER_SWARM_IPTABLES_PERSIST=true
+ANSIBLE_DOCKER_SWARM_IPTABLES_SAVE_PATH=/etc/iptables/rules.v4
+ANSIBLE_DOCKER_SWARM_IPSET_MANAGERS_NAME=swarm_managers
+ANSIBLE_DOCKER_SWARM_IPSET_NODES_NAME=swarm_nodes
+ANSIBLE_DOCKER_SWARM_IPSET_SERVICE_CLIENTS_NAME=app_clients
+ANSIBLE_DOCKER_SWARM_IPSET_LOGGER_NAME=syslog_nodes
+ANSIBLE_DOCKER_SWARM_EXTERNAL_SERVICE_IPSET_NAMES="{database: mysql_nodes, storage: minio_nodes}"
 ANSIBLE_DOCKER_SWARM_SERVICE_ALLOWED_SOURCE_IPS="[172.16.3.98, 172.16.3.99]"
 ANSIBLE_DOCKER_SWARM_SERVICE_HOST_INTERFACE=ens18
 ANSIBLE_DOCKER_SWARM_SERVICE_BRIDGE_INTERFACE=docker_gwbridge
@@ -25,12 +35,24 @@ ANSIBLE_DOCKER_SWARM_LOGGER_PORT=514
 ANSIBLE_DOCKER_SWARM_LOGGER_PROTOCOLS="[tcp, udp]"
 ```
 
-Service source IPs for published Swarm services are handled in `DOCKER-USER`:
+Managed ipsets:
+
+- `swarm_managers`: manager node IPs
+- `swarm_nodes`: all manager and worker node IPs
+- `app_clients`: IPs in `ANSIBLE_DOCKER_SWARM_SERVICE_ALLOWED_SOURCE_IPS`
+- `mysql_nodes`: `database` external service IPs by default
+- `minio_nodes`: `storage` external service IPs by default
+- `syslog_nodes`: logger node IPs
+
+Service source IPs for published Swarm services are handled in `DOCKER-USER`
+with `app_clients`:
 
 ```bash
-iptables -A DOCKER-USER -s <source-ip> -i <host-interface> -o docker_gwbridge -p tcp -m multiport --dports <ports> -j ACCEPT
-iptables -A DOCKER-USER -d <source-ip> -o <host-interface> -i docker_gwbridge -p tcp -m multiport --sports <ports> -j ACCEPT
+iptables -A DOCKER-USER -m set --match-set app_clients src -i <host-interface> -o docker_gwbridge -p tcp -m multiport --dports <ports> -j ACCEPT
 ```
+
+The role inserts `ESTABLISHED,RELATED` rules, so it does not write separate
+reverse `--sports` rules.
 
 `ANSIBLE_DOCKER_SWARM_SERVICE_PORTS_BY_HOST` overrides
 `ANSIBLE_DOCKER_SWARM_SERVICE_PORTS` for matching node IPs.
@@ -44,12 +66,16 @@ When `ANSIBLE_DOCKER_SWARM_DOCKER_USER_DROP_ENABLED=true`, the role appends
 `iptables -A DOCKER-USER -j DROP` after allow rules and removes Docker's
 default `iptables -D DOCKER-USER -j RETURN` first.
 
+When persistence is enabled, the task saves ipsets to `/etc/iptables/ipsets`
+and the final iptables state to `/etc/iptables/rules.v4`, so
+`netfilter-persistent` can restore both after reboot.
+
 External service IP/port lists for Swarm containers are also handled in
 `DOCKER-USER`:
 
 ```bash
-iptables -A DOCKER-USER -s <external-ip> -i <host-interface> -o docker_gwbridge -p tcp -m multiport --sports <ports> -j ACCEPT
-iptables -A DOCKER-USER -d <external-ip> -o <host-interface> -i docker_gwbridge -p tcp -m multiport --dports <ports> -j ACCEPT
+iptables -A DOCKER-USER -i docker_gwbridge -o <host-interface> -m set --match-set mysql_nodes dst -p tcp -m multiport --dports 3306 -j ACCEPT
+iptables -A DOCKER-USER -i docker_gwbridge -o <host-interface> -m set --match-set minio_nodes dst -p tcp -m multiport --dports 9000 -j ACCEPT
 ```
 
 ## Command
@@ -63,19 +89,21 @@ Sub-task tags:
 
 ```bash
 ./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_nodes
+./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_ipsets
 ./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_allow_connect_in
 ./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_allow_connect_out
 ./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_docker_user_drop
+./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_save
 ```
 
 ## Opened Traffic
 
-- worker/client traffic to managers on `2377/tcp`
-- manager/server traffic from nodes on `2377/tcp`
-- bidirectional node discovery on `7946/tcp`
-- bidirectional node discovery on `7946/udp`
-- bidirectional overlay networking on `4789/udp`
-- bidirectional protocol `esp` when encrypted overlay support is enabled
+- worker/client traffic to `swarm_managers` on `2377/tcp`
+- manager/server traffic from `swarm_nodes` on `2377/tcp`
+- node discovery with `swarm_nodes` on `7946/tcp`
+- node discovery with `swarm_nodes` on `7946/udp`
+- overlay networking with `swarm_nodes` on `4789/udp`
+- IP protocol `esp` with `swarm_nodes` when encrypted overlay support is enabled
 - logger nodes with `node_tag=logger` accept `514/tcp` and `514/udp` from all
   Swarm node IPs
 - published service source IPs through `DOCKER-USER` when

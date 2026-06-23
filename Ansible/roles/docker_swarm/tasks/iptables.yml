@@ -71,6 +71,9 @@
   ansible.builtin.set_fact:
     docker_swarm_iptables_rules: []
     docker_swarm_iptables_group_labels: {}
+    docker_swarm_managed_ipsets: []
+    docker_swarm_managed_ipset_entries: []
+    docker_swarm_external_service_ipset_rules: []
   tags:
     - docker_swarm
     - docker_swarm_iptables
@@ -94,6 +97,21 @@
     - docker_swarm_iptables
     - always
 
+- name: Add Docker Swarm base established rules
+  ansible.builtin.set_fact:
+    docker_swarm_iptables_rules: >-
+      {{
+        docker_swarm_iptables_rules
+        + [
+          {'chain': 'INPUT', 'args': ['-m', 'conntrack', '--ctstate', 'ESTABLISHED,RELATED', '-j', 'ACCEPT']},
+          {'chain': 'OUTPUT', 'args': ['-m', 'conntrack', '--ctstate', 'ESTABLISHED,RELATED', '-j', 'ACCEPT']}
+        ]
+      }}
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
+
 - name: Add Docker Swarm manager join client rules
   ansible.builtin.set_fact:
     docker_swarm_iptables_rules: >-
@@ -101,17 +119,11 @@
         docker_swarm_iptables_rules
         + [
           {
-            'chain': 'INPUT',
-            'args': ['-p', 'tcp', '-s', item, '--sport', docker_swarm_port | string, '-j', 'ACCEPT']
-          },
-          {
             'chain': 'OUTPUT',
-            'args': ['-p', 'tcp', '-d', item, '--dport', docker_swarm_port | string, '-j', 'ACCEPT']
+            'args': ['-m', 'set', '--match-set', docker_swarm_ipset_managers_name, 'dst', '-p', 'tcp', '--dport', docker_swarm_port | string, '-j', 'ACCEPT']
           }
         ]
       }}
-  loop: "{{ docker_swarm_iptables_manager_ips | default([]) | unique }}"
-  when: item != docker_swarm_iptables_local_ip
   tags:
     - docker_swarm
     - docker_swarm_iptables
@@ -125,18 +137,11 @@
         + [
           {
             'chain': 'INPUT',
-            'args': ['-p', 'tcp', '-s', item, '--dport', docker_swarm_port | string, '-j', 'ACCEPT']
-          },
-          {
-            'chain': 'OUTPUT',
-            'args': ['-p', 'tcp', '-d', item, '--sport', docker_swarm_port | string, '-j', 'ACCEPT']
+            'args': ['-m', 'set', '--match-set', docker_swarm_ipset_nodes_name, 'src', '-p', 'tcp', '--dport', docker_swarm_port | string, '-j', 'ACCEPT']
           }
         ]
       }}
-  loop: "{{ docker_swarm_iptables_node_ips | default([]) | unique }}"
-  when:
-    - docker_swarm_iptables_local_ip in (docker_swarm_iptables_manager_ips | default([]))
-    - item != docker_swarm_iptables_local_ip
+  when: docker_swarm_iptables_local_ip in (docker_swarm_iptables_manager_ips | default([]))
   tags:
     - docker_swarm
     - docker_swarm_iptables
@@ -148,22 +153,14 @@
       {{
         docker_swarm_iptables_rules
         + [
-          {'chain': 'INPUT', 'args': ['-p', 'tcp', '-s', item, '--dport', '7946', '-j', 'ACCEPT']},
-          {'chain': 'INPUT', 'args': ['-p', 'udp', '-s', item, '--dport', '7946', '-j', 'ACCEPT']},
-          {'chain': 'OUTPUT', 'args': ['-p', 'tcp', '-d', item, '--sport', '7946', '-j', 'ACCEPT']},
-          {'chain': 'OUTPUT', 'args': ['-p', 'udp', '-d', item, '--sport', '7946', '-j', 'ACCEPT']},
-          {'chain': 'INPUT', 'args': ['-p', 'tcp', '-s', item, '--sport', '7946', '-j', 'ACCEPT']},
-          {'chain': 'INPUT', 'args': ['-p', 'udp', '-s', item, '--sport', '7946', '-j', 'ACCEPT']},
-          {'chain': 'OUTPUT', 'args': ['-p', 'tcp', '-d', item, '--dport', '7946', '-j', 'ACCEPT']},
-          {'chain': 'OUTPUT', 'args': ['-p', 'udp', '-d', item, '--dport', '7946', '-j', 'ACCEPT']},
-          {'chain': 'INPUT', 'args': ['-p', 'udp', '-s', item, '--dport', '4789', '-j', 'ACCEPT']},
-          {'chain': 'OUTPUT', 'args': ['-p', 'udp', '-d', item, '--sport', '4789', '-j', 'ACCEPT']},
-          {'chain': 'INPUT', 'args': ['-p', 'udp', '-s', item, '--sport', '4789', '-j', 'ACCEPT']},
-          {'chain': 'OUTPUT', 'args': ['-p', 'udp', '-d', item, '--dport', '4789', '-j', 'ACCEPT']}
+          {'chain': 'INPUT', 'args': ['-m', 'set', '--match-set', docker_swarm_ipset_nodes_name, 'src', '-p', 'tcp', '--dport', '7946', '-j', 'ACCEPT']},
+          {'chain': 'OUTPUT', 'args': ['-m', 'set', '--match-set', docker_swarm_ipset_nodes_name, 'dst', '-p', 'tcp', '--dport', '7946', '-j', 'ACCEPT']},
+          {'chain': 'INPUT', 'args': ['-m', 'set', '--match-set', docker_swarm_ipset_nodes_name, 'src', '-p', 'udp', '--dport', '7946', '-j', 'ACCEPT']},
+          {'chain': 'OUTPUT', 'args': ['-m', 'set', '--match-set', docker_swarm_ipset_nodes_name, 'dst', '-p', 'udp', '--dport', '7946', '-j', 'ACCEPT']},
+          {'chain': 'INPUT', 'args': ['-m', 'set', '--match-set', docker_swarm_ipset_nodes_name, 'src', '-p', 'udp', '--dport', '4789', '-j', 'ACCEPT']},
+          {'chain': 'OUTPUT', 'args': ['-m', 'set', '--match-set', docker_swarm_ipset_nodes_name, 'dst', '-p', 'udp', '--dport', '4789', '-j', 'ACCEPT']}
         ]
       }}
-  loop: "{{ docker_swarm_iptables_node_ips | default([]) | unique }}"
-  when: item != docker_swarm_iptables_local_ip
   tags:
     - docker_swarm
     - docker_swarm_iptables
@@ -175,14 +172,11 @@
       {{
         docker_swarm_iptables_rules
         + [
-          {'chain': 'INPUT', 'args': ['-p', 'esp', '-s', item, '-j', 'ACCEPT']},
-          {'chain': 'OUTPUT', 'args': ['-p', 'esp', '-d', item, '-j', 'ACCEPT']}
+          {'chain': 'INPUT', 'args': ['-m', 'set', '--match-set', docker_swarm_ipset_nodes_name, 'src', '-p', 'esp', '-j', 'ACCEPT']},
+          {'chain': 'OUTPUT', 'args': ['-m', 'set', '--match-set', docker_swarm_ipset_nodes_name, 'dst', '-p', 'esp', '-j', 'ACCEPT']}
         ]
       }}
-  loop: "{{ docker_swarm_iptables_node_ips | default([]) | unique }}"
-  when:
-    - docker_swarm_manage_encrypted_overlay_esp | bool
-    - item != docker_swarm_iptables_local_ip
+  when: docker_swarm_manage_encrypted_overlay_esp | bool
   tags:
     - docker_swarm
     - docker_swarm_iptables
@@ -213,24 +207,17 @@
           {
             'chain': 'INPUT',
             'args': [
-              '-p', item.1,
-              '-s', item.0,
+              '-p', item,
+              '-m', 'set',
+              '--match-set', docker_swarm_ipset_nodes_name,
+              'src',
               '--dport', docker_swarm_logger_port | string,
-              '-j', 'ACCEPT'
-            ]
-          },
-          {
-            'chain': 'OUTPUT',
-            'args': [
-              '-p', item.1,
-              '-d', item.0,
-              '--sport', docker_swarm_logger_port | string,
               '-j', 'ACCEPT'
             ]
           }
         ]
       }}
-  loop: "{{ (docker_swarm_iptables_node_ips | default([]) | unique | difference([docker_swarm_iptables_local_ip])) | product(docker_swarm_logger_protocols) | list }}"
+  loop: "{{ docker_swarm_logger_protocols }}"
   when: (docker_swarm_iptables_node_labels | default({})).node_tag | default('') == docker_swarm_logger_node_tag
   tags:
     - docker_swarm
@@ -271,6 +258,26 @@
         docker_swarm_external_service_rules_by_host[docker_swarm_iptables_local_ip]
         | default(docker_swarm_external_service_rules)
       }}
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
+
+- name: Build Docker Swarm external service ipset rules
+  ansible.builtin.set_fact:
+    docker_swarm_external_service_ipset_rules: >-
+      {{
+        (docker_swarm_external_service_ipset_rules | default([]))
+        + [
+          item | combine({
+            'ipset_name': (
+              docker_swarm_external_service_ipset_names[item.name]
+              | default((docker_swarm_ipset_prefix ~ '_' ~ item.name) | regex_replace('[^A-Za-z0-9_:-]', '_'))
+            )
+          })
+        ]
+      }}
+  loop: "{{ docker_swarm_effective_external_service_rules }}"
   tags:
     - docker_swarm
     - docker_swarm_iptables
@@ -345,8 +352,101 @@
 
 - name: Initialize Docker Swarm service DOCKER-USER rules
   ansible.builtin.set_fact:
-    docker_swarm_allow_connect_in_rules: []
-    docker_swarm_allow_connect_out_rules: []
+    docker_swarm_allow_connect_in_rules:
+      - chain: DOCKER-USER
+        args:
+          - -m
+          - conntrack
+          - --ctstate
+          - ESTABLISHED,RELATED
+          - -j
+          - ACCEPT
+    docker_swarm_allow_connect_out_rules:
+      - chain: DOCKER-USER
+        args:
+          - -m
+          - conntrack
+          - --ctstate
+          - ESTABLISHED,RELATED
+          - -j
+          - ACCEPT
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
+
+- name: Build Docker Swarm managed ipset definitions
+  ansible.builtin.set_fact:
+    docker_swarm_managed_ipsets: >-
+      {{
+        (
+          [
+            docker_swarm_ipset_managers_name,
+            docker_swarm_ipset_nodes_name,
+            docker_swarm_ipset_service_clients_name,
+            docker_swarm_ipset_logger_name
+          ]
+          + (docker_swarm_external_service_ipset_rules | map(attribute='ipset_name') | list)
+        )
+        | unique
+      }}
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
+
+- name: Build Docker Swarm managed ipset entries
+  ansible.builtin.set_fact:
+    docker_swarm_managed_ipset_entries: "{{ docker_swarm_managed_ipset_entries + [{'set_name': docker_swarm_ipset_managers_name, 'ip': item}] }}"
+  loop: "{{ docker_swarm_iptables_manager_ips | default([]) | unique }}"
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
+
+- name: Add Docker Swarm node ipset entries
+  ansible.builtin.set_fact:
+    docker_swarm_managed_ipset_entries: "{{ docker_swarm_managed_ipset_entries + [{'set_name': docker_swarm_ipset_nodes_name, 'ip': item}] }}"
+  loop: "{{ docker_swarm_iptables_node_ips | default([]) | unique }}"
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
+
+- name: Add Docker Swarm service client ipset entries
+  ansible.builtin.set_fact:
+    docker_swarm_managed_ipset_entries: "{{ docker_swarm_managed_ipset_entries + [{'set_name': docker_swarm_ipset_service_clients_name, 'ip': item}] }}"
+  loop: "{{ docker_swarm_service_allowed_source_ips | default([]) | unique }}"
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
+
+- name: Add Docker Swarm logger ipset entries
+  ansible.builtin.set_fact:
+    docker_swarm_managed_ipset_entries: "{{ docker_swarm_managed_ipset_entries + [{'set_name': docker_swarm_ipset_logger_name, 'ip': item}] }}"
+  loop: "{{ docker_swarm_iptables_logger_ips | default([]) | unique }}"
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
+
+- name: Add Docker Swarm external service ipset entries
+  ansible.builtin.set_fact:
+    docker_swarm_managed_ipset_entries: >-
+      {{
+        docker_swarm_managed_ipset_entries
+        + [{'set_name': item.0.ipset_name, 'ip': item.1}]
+      }}
+  loop: "{{ docker_swarm_external_service_ipset_rules | subelements('ips') }}"
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
+
+- name: Deduplicate Docker Swarm managed ipset entries
+  ansible.builtin.set_fact:
+    docker_swarm_managed_ipset_entries: "{{ docker_swarm_managed_ipset_entries | unique }}"
   tags:
     - docker_swarm
     - docker_swarm_iptables
@@ -361,7 +461,9 @@
           {
             'chain': 'DOCKER-USER',
             'args': [
-              '-s', item,
+              '-m', 'set',
+              '--match-set', docker_swarm_ipset_service_clients_name,
+              'src',
               '-i', docker_swarm_service_host_interface,
               '-o', docker_swarm_service_bridge_interface,
               '-p', 'tcp',
@@ -369,22 +471,10 @@
               '--dports', docker_swarm_effective_service_ports | map('string') | join(','),
               '-j', 'ACCEPT'
             ]
-          },
-          {
-            'chain': 'DOCKER-USER',
-            'args': [
-              '-d', item,
-              '-o', docker_swarm_service_host_interface,
-              '-i', docker_swarm_service_bridge_interface,
-              '-p', 'tcp',
-              '-m', 'multiport',
-              '--sports', docker_swarm_effective_service_ports | map('string') | join(','),
-              '-j', 'ACCEPT'
-            ]
           }
         ]
       }}
-  loop: "{{ docker_swarm_service_allowed_source_ips }}"
+  when: docker_swarm_service_allowed_source_ips | length > 0
   tags:
     - docker_swarm
     - docker_swarm_iptables
@@ -399,30 +489,20 @@
           {
             'chain': 'DOCKER-USER',
             'args': [
-              '-s', item.1,
-              '-i', docker_swarm_service_host_interface,
-              '-o', docker_swarm_service_bridge_interface,
-              '-p', 'tcp',
-              '-m', 'multiport',
-              '--sports', item.0.ports | map('string') | join(','),
-              '-j', 'ACCEPT'
-            ]
-          },
-          {
-            'chain': 'DOCKER-USER',
-            'args': [
-              '-d', item.1,
-              '-o', docker_swarm_service_host_interface,
               '-i', docker_swarm_service_bridge_interface,
+              '-o', docker_swarm_service_host_interface,
+              '-m', 'set',
+              '--match-set', item.ipset_name,
+              'dst',
               '-p', 'tcp',
               '-m', 'multiport',
-              '--dports', item.0.ports | map('string') | join(','),
+              '--dports', item.ports | map('string') | join(','),
               '-j', 'ACCEPT'
             ]
           }
         ]
       }}
-  loop: "{{ docker_swarm_effective_external_service_rules | subelements('ips') }}"
+  loop: "{{ docker_swarm_external_service_ipset_rules }}"
   tags:
     - docker_swarm
     - docker_swarm_iptables
@@ -437,34 +517,32 @@
           {
             'chain': 'DOCKER-USER',
             'args': [
-              '-s', item,
-              '-i', docker_swarm_service_host_interface,
-              '-o', docker_swarm_service_bridge_interface,
-              '-p', 'tcp',
-              '-m', 'multiport',
-              '--sports', docker_swarm_logger_port | string,
-              '-j', 'ACCEPT'
-            ]
-          },
-          {
-            'chain': 'DOCKER-USER',
-            'args': [
-              '-d', item,
-              '-o', docker_swarm_service_host_interface,
               '-i', docker_swarm_service_bridge_interface,
-              '-p', 'tcp',
-              '-m', 'multiport',
-              '--dports', docker_swarm_logger_port | string,
+              '-o', docker_swarm_service_host_interface,
+              '-m', 'set',
+              '--match-set', docker_swarm_ipset_logger_name,
+              'dst',
+              '-p', item,
+              '--dport', docker_swarm_logger_port | string,
               '-j', 'ACCEPT'
             ]
           }
         ]
       }}
-  loop: "{{ docker_swarm_iptables_logger_ips | unique }}"
+  loop: "{{ docker_swarm_logger_protocols }}"
+  when: docker_swarm_iptables_logger_ips | length > 0
   tags:
     - docker_swarm
     - docker_swarm_iptables
     - always
+
+- name: Apply Docker Swarm ipsets
+  ansible.builtin.include_tasks: iptables_ipsets.yml
+  when: docker_swarm_manage_ipsets | bool
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - docker_swarm_iptables_ipsets
 
 - name: Apply Docker Swarm node communication iptables rules
   ansible.builtin.include_tasks: iptables_nodes.yml
@@ -493,3 +571,15 @@
     - docker_swarm
     - docker_swarm_iptables
     - docker_swarm_iptables_docker_user_drop
+
+- name: Save Docker Swarm iptables and ipsets for netfilter-persistent
+  ansible.builtin.include_tasks: iptables_save.yml
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - docker_swarm_iptables_ipsets
+    - docker_swarm_iptables_nodes
+    - docker_swarm_iptables_allow_connect_in
+    - docker_swarm_iptables_allow_connect_out
+    - docker_swarm_iptables_docker_user_drop
+    - docker_swarm_iptables_save

@@ -3,6 +3,9 @@
 This task configures common iptables ACCEPT rules on the configured target
 group.
 
+Run order for applying allow rules and final DROP policies:
+[RUN_ORDER.md](RUN_ORDER.md)
+
 ## What It Does
 
 - allows loopback input and output traffic
@@ -10,8 +13,6 @@ group.
 - allows established output connections
 - allows new and established SSH input from `ANSIBLE_IPTABLES_SSH_WHITELIST_IPS`
 - allows established SSH output back to `ANSIBLE_IPTABLES_SSH_WHITELIST_IPS`
-- allows optional non-Swarm source IP exceptions through `INPUT` and response
-  traffic through `OUTPUT`
 - allows optional non-Swarm external service IP/port lists through `OUTPUT`,
   plus response traffic through `INPUT`
 - allows custom per-IP port lists from `ANSIBLE_IPTABLES_IP_PORT_RULES`
@@ -41,6 +42,12 @@ ANSIBLE_IPTABLES_ENABLED=true
 ANSIBLE_IPTABLES_TARGET_GROUP=iptables_targets
 ANSIBLE_IPTABLES_RESET_ENABLED=true
 ANSIBLE_IPTABLES_RESET_CHAINS="[INPUT, OUTPUT]"
+ANSIBLE_IPTABLES_MANAGE_IPSETS=true
+ANSIBLE_IPTABLES_IPSET_PERSIST=true
+ANSIBLE_IPTABLES_IPSET_SAVE_PATH=/etc/iptables/ipsets
+ANSIBLE_IPTABLES_PERSIST=true
+ANSIBLE_IPTABLES_SAVE_PATH=/etc/iptables/rules.v4
+ANSIBLE_IPTABLES_IPSET_PREFIX=common
 ANSIBLE_IPTABLES_SSH_WHITELIST_IPS="172.16.3.21,172.16.3.22"
 ANSIBLE_IPTABLES_SSH_PORT=22
 ANSIBLE_IPTABLES_SERVICE_ALLOWED_SOURCE_IPS="[]"
@@ -55,7 +62,7 @@ ANSIBLE_IPTABLES_DNS_TIME_CLIENT_SOURCES="[]"
 ANSIBLE_IPTABLES_DNS_PORT=53
 ANSIBLE_IPTABLES_TIME_PORT=123
 ANSIBLE_IPTABLES_BLOCK_ENABLED=false
-ANSIBLE_IPTABLES_BLOCK_CHAINS="[INPUT, OUTPUT]"
+ANSIBLE_IPTABLES_BLOCK_CHAINS="[INPUT, FORWARD, OUTPUT]"
 ```
 
 `ANSIBLE_IPTABLES_SSH_WHITELIST_IPS` is a comma-separated list of IPv4
@@ -65,10 +72,11 @@ addresses or CIDRs.
 policy to `ACCEPT`, flush old rules from `ANSIBLE_IPTABLES_RESET_CHAINS`, then
 apply the new rules.
 
-`ANSIBLE_IPTABLES_SERVICE_ALLOWED_SOURCE_IPS` is kept for non-Swarm host
-service exceptions. Published Docker Swarm service source IPs should be set in
-`ANSIBLE_DOCKER_SWARM_SERVICE_ALLOWED_SOURCE_IPS` so they are written to
-`DOCKER-USER`.
+`ANSIBLE_IPTABLES_SERVICE_ALLOWED_SOURCE_IPS` must stay `[]` in DROP mode. The
+role rejects non-empty values because that legacy setting would create broad
+host-level allow rules. Use `ANSIBLE_IPTABLES_INBOUND_SERVICE_RULES`,
+`ANSIBLE_IPTABLES_EXTERNAL_SERVICE_RULES`, or `ANSIBLE_IPTABLES_IP_PORT_RULES`
+so each whitelist also names the allowed port.
 
 `ANSIBLE_IPTABLES_EXTERNAL_SERVICE_RULES` is a YAML list of service definitions.
 Each item supports `name`, `ips`, `ports`, and optional `protocol` (`tcp` by
@@ -98,8 +106,18 @@ addresses or CIDRs. The role opens passive agent polling on
 `ANSIBLE_IPTABLES_DNS_TIME_SERVER_IPS` is a YAML list of DNS/time server IPv4
 addresses or CIDRs. `ANSIBLE_IPTABLES_DNS_TIME_CLIENT_SOURCES` is a YAML list of
 client source IPv4 addresses or CIDRs allowed to query local DNS/time services.
+When `ANSIBLE_IPTABLES_DNS_TIME_CLIENT_SOURCES=[]`, DNS/time server hosts allow
+all hosts in `ANSIBLE_IPTABLES_TARGET_GROUP` to connect to `53/tcp`, `53/udp`,
+and `123/udp`.
 
-`ANSIBLE_IPTABLES_BLOCK_CHAINS` supports only `INPUT` and `OUTPUT`.
+`ANSIBLE_IPTABLES_BLOCK_CHAINS` supports only `INPUT`, `FORWARD`, and `OUTPUT`.
+
+When `ANSIBLE_IPTABLES_MANAGE_IPSETS=true`, common rules use `ipset` groups
+instead of one rule per IP. The role saves those sets to
+`ANSIBLE_IPTABLES_IPSET_SAVE_PATH` when persistence is enabled. The role also
+writes `iptables-save` output to `ANSIBLE_IPTABLES_SAVE_PATH` when
+`ANSIBLE_IPTABLES_PERSIST=true`, so `netfilter-persistent` can restore the
+filter rules after reboot.
 
 ## Command
 
@@ -108,6 +126,12 @@ Add allow rules first:
 ```bash
 cd Ansible
 ./scripts/run-ansible.sh deploy --tags iptables
+```
+
+Save the current ipset and iptables state only:
+
+```bash
+./scripts/run-ansible.sh deploy --tags iptables_save
 ```
 
 The singular alias also works:

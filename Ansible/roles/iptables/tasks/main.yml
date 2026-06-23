@@ -68,12 +68,15 @@
   tags:
     - iptables
 
-- name: Validate iptables service source whitelist entries
+- name: Validate legacy iptables service source whitelist is disabled
   ansible.builtin.assert:
     that:
-      - item is match('^([0-9]{1,3}\.){3}[0-9]{1,3}(/([0-9]|[12][0-9]|3[0-2]))?$')
-    fail_msg: "Invalid iptables service source whitelist entry: {{ item }}"
-  loop: "{{ iptables_service_allowed_source_ips }}"
+      - iptables_service_allowed_source_ips | length == 0
+    fail_msg: >-
+      ANSIBLE_IPTABLES_SERVICE_ALLOWED_SOURCE_IPS creates broad host-level
+      access and is disabled for INPUT/OUTPUT DROP mode. Use
+      ANSIBLE_IPTABLES_INBOUND_SERVICE_RULES, ANSIBLE_IPTABLES_EXTERNAL_SERVICE_RULES,
+      or ANSIBLE_IPTABLES_IP_PORT_RULES with explicit ports instead.
   tags:
     - iptables
 
@@ -278,7 +281,7 @@
           - -m
           - conntrack
           - --ctstate
-          - ESTABLISHED
+          - ESTABLISHED,RELATED
           - -j
           - ACCEPT
   tags:
@@ -288,21 +291,59 @@
   ansible.builtin.set_fact:
     iptables_service_rules: []
     iptables_inbound_service_allow_rules: []
+    iptables_external_service_ipset_rules: []
+    iptables_inbound_service_ipset_rules: []
+    iptables_per_ip_port_ipset_rules: []
+    iptables_managed_ipsets: []
+    iptables_managed_ipset_entries: []
     iptables_local_ip: "{{ ansible_host | default(inventory_hostname) }}"
   tags:
     - iptables
 
-- name: Add iptables source rules for access to local services
+- name: Build iptables external service ipset rules
   ansible.builtin.set_fact:
-    iptables_service_rules: >-
+    iptables_external_service_ipset_rules: >-
       {{
-        iptables_service_rules
+        iptables_external_service_ipset_rules
         + [
-          {'chain': 'INPUT', 'args': ['-s', item, '-j', 'ACCEPT']},
-          {'chain': 'OUTPUT', 'args': ['-d', item, '-j', 'ACCEPT']}
+          item | combine({
+            'ipset_name': ((iptables_ipset_prefix ~ '_' ~ item.name) | regex_replace('[^A-Za-z0-9_:-]', '_'))
+          })
         ]
       }}
-  loop: "{{ iptables_service_allowed_source_ips }}"
+  loop: "{{ iptables_external_service_rules }}"
+  tags:
+    - iptables
+
+- name: Build iptables inbound service ipset rules for this host
+  ansible.builtin.set_fact:
+    iptables_inbound_service_ipset_rules: >-
+      {{
+        iptables_inbound_service_ipset_rules
+        + [
+          item | combine({
+            'ipset_name': ((iptables_ipset_prefix ~ '_in_' ~ item.name) | regex_replace('[^A-Za-z0-9_:-]', '_'))
+          })
+        ]
+      }}
+  loop: "{{ iptables_inbound_service_rules }}"
+  when: iptables_local_ip in item.target_ips
+  tags:
+    - iptables
+
+- name: Build iptables per-IP port ipset rules
+  ansible.builtin.set_fact:
+    iptables_per_ip_port_ipset_rules: >-
+      {{
+        iptables_per_ip_port_ipset_rules
+        + [
+          item | combine({
+            'ipset_name': ((iptables_ipset_prefix ~ '_ip_' ~ (item.ip | regex_replace('[^A-Za-z0-9_:-]', '_'))) | regex_replace('[^A-Za-z0-9_:-]', '_'))
+          })
+        ]
+      }}
+  loop: "{{ iptables_ip_port_rules }}"
+  when: item.ports | length > 0
   tags:
     - iptables
 
@@ -315,27 +356,18 @@
           {
             'chain': 'OUTPUT',
             'args': [
-              '-d', item.1,
-              '-p', item.0.protocol | default('tcp'),
+              '-m', 'set',
+              '--match-set', item.ipset_name,
+              'dst',
+              '-p', item.protocol | default('tcp'),
               '-m', 'multiport',
-              '--dports', item.0.ports | map('string') | join(','),
-              '-j', 'ACCEPT'
-            ]
-          },
-          {
-            'chain': 'INPUT',
-            'args': [
-              '-s', item.1,
-              '-p', item.0.protocol | default('tcp'),
-              '-m', 'multiport',
-              '--sports', item.0.ports | map('string') | join(','),
+              '--dports', item.ports | map('string') | join(','),
               '-j', 'ACCEPT'
             ]
           }
         ]
       }}
-  loop: "{{ iptables_external_service_rules | subelements('ips') }}"
-  when: item.1 != iptables_local_ip
+  loop: "{{ iptables_external_service_ipset_rules }}"
   tags:
     - iptables
 
@@ -348,27 +380,18 @@
           {
             'chain': 'INPUT',
             'args': [
-              '-s', item.1,
-              '-p', item.0.protocol | default('tcp'),
+              '-m', 'set',
+              '--match-set', item.ipset_name,
+              'src',
+              '-p', item.protocol | default('tcp'),
               '-m', 'multiport',
-              '--dports', item.0.ports | map('string') | join(','),
-              '-j', 'ACCEPT'
-            ]
-          },
-          {
-            'chain': 'OUTPUT',
-            'args': [
-              '-d', item.1,
-              '-p', item.0.protocol | default('tcp'),
-              '-m', 'multiport',
-              '--sports', item.0.ports | map('string') | join(','),
+              '--dports', item.ports | map('string') | join(','),
               '-j', 'ACCEPT'
             ]
           }
         ]
       }}
-  loop: "{{ iptables_inbound_service_rules | subelements('source_ips') }}"
-  when: iptables_local_ip in item.0.target_ips
+  loop: "{{ iptables_inbound_service_ipset_rules }}"
   tags:
     - iptables
     - iptables_primary
@@ -382,7 +405,21 @@
         | reject('equalto', ansible_host | default(inventory_hostname))
         | list
       }}
+    iptables_target_ips: []
     iptables_zabbix_agent_ips: []
+  tags:
+    - iptables
+
+- name: Resolve iptables target IPs from target group
+  ansible.builtin.set_fact:
+    iptables_target_ips: >-
+      {{
+        (iptables_target_ips | default([]))
+        + [
+          hostvars[item].ansible_host | default(item)
+        ]
+      }}
+  loop: "{{ groups[iptables_target_group] | default([]) }}"
   tags:
     - iptables
 
@@ -415,7 +452,9 @@
           {
             'chain': 'INPUT',
             'args': [
-              '-s', item.ip,
+              '-m', 'set',
+              '--match-set', item.ipset_name,
+              'src',
               '-p', item.protocol | default('tcp'),
               '-m', 'multiport',
               '--dports', item.ports | map('string') | join(','),
@@ -425,37 +464,18 @@
           {
             'chain': 'OUTPUT',
             'args': [
-              '-d', item.ip,
-              '-p', item.protocol | default('tcp'),
-              '-m', 'multiport',
-              '--sports', item.ports | map('string') | join(','),
-              '-j', 'ACCEPT'
-            ]
-          },
-          {
-            'chain': 'OUTPUT',
-            'args': [
-              '-d', item.ip,
+              '-m', 'set',
+              '--match-set', item.ipset_name,
+              'dst',
               '-p', item.protocol | default('tcp'),
               '-m', 'multiport',
               '--dports', item.ports | map('string') | join(','),
               '-j', 'ACCEPT'
             ]
           },
-          {
-            'chain': 'INPUT',
-            'args': [
-              '-s', item.ip,
-              '-p', item.protocol | default('tcp'),
-              '-m', 'multiport',
-              '--sports', item.ports | map('string') | join(','),
-              '-j', 'ACCEPT'
-            ]
-          }
         ]
       }}
-  loop: "{{ iptables_ip_port_rules }}"
-  when: item.ports | length > 0
+  loop: "{{ iptables_per_ip_port_ipset_rules }}"
   tags:
     - iptables
 
@@ -468,7 +488,9 @@
           {
             'chain': 'INPUT',
             'args': [
-              '-s', item,
+              '-m', 'set',
+              '--match-set', iptables_ipset_zabbix_servers_name,
+              'src',
               '-p', 'tcp',
               '--dport', iptables_zabbix_agent_port | string,
               '-m', 'conntrack',
@@ -479,39 +501,19 @@
           {
             'chain': 'OUTPUT',
             'args': [
-              '-d', item,
-              '-p', 'tcp',
-              '--sport', iptables_zabbix_agent_port | string,
-              '-m', 'conntrack',
-              '--ctstate', 'ESTABLISHED',
-              '-j', 'ACCEPT'
-            ]
-          },
-          {
-            'chain': 'OUTPUT',
-            'args': [
-              '-d', item,
+              '-m', 'set',
+              '--match-set', iptables_ipset_zabbix_servers_name,
+              'dst',
               '-p', 'tcp',
               '--dport', iptables_zabbix_server_port | string,
               '-m', 'conntrack',
               '--ctstate', 'NEW,ESTABLISHED',
               '-j', 'ACCEPT'
             ]
-          },
-          {
-            'chain': 'INPUT',
-            'args': [
-              '-s', item,
-              '-p', 'tcp',
-              '--sport', iptables_zabbix_server_port | string,
-              '-m', 'conntrack',
-              '--ctstate', 'ESTABLISHED',
-              '-j', 'ACCEPT'
-            ]
           }
         ]
       }}
-  loop: "{{ iptables_zabbix_server_ips }}"
+  loop: "{{ [iptables_ipset_zabbix_servers_name] }}"
   when: iptables_local_ip not in iptables_zabbix_server_ips
   tags:
     - iptables
@@ -525,7 +527,9 @@
           {
             'chain': 'OUTPUT',
             'args': [
-              '-d', item,
+              '-m', 'set',
+              '--match-set', iptables_ipset_zabbix_agents_name,
+              'dst',
               '-p', 'tcp',
               '--dport', iptables_zabbix_agent_port | string,
               '-m', 'conntrack',
@@ -533,20 +537,9 @@
               '-j', 'ACCEPT'
             ]
           },
-          {
-            'chain': 'INPUT',
-            'args': [
-              '-s', item,
-              '-p', 'tcp',
-              '--sport', iptables_zabbix_agent_port | string,
-              '-m', 'conntrack',
-              '--ctstate', 'ESTABLISHED',
-              '-j', 'ACCEPT'
-            ]
-          }
         ]
       }}
-  loop: "{{ iptables_zabbix_agent_ips | unique }}"
+  loop: "{{ [iptables_ipset_zabbix_agents_name] }}"
   when: iptables_local_ip in iptables_zabbix_server_ips
   tags:
     - iptables
@@ -554,6 +547,15 @@
 - name: Initialize iptables DNS/time rules
   ansible.builtin.set_fact:
     iptables_dns_time_rules: []
+    iptables_dns_time_effective_client_sources: >-
+      {{
+        (
+          iptables_dns_time_client_sources
+          if (iptables_dns_time_client_sources | length > 0)
+          else (iptables_target_ips | reject('equalto', iptables_local_ip) | list)
+        )
+        | unique
+      }}
   tags:
     - iptables
 
@@ -565,31 +567,22 @@
         + [
           {
             'chain': 'INPUT',
-            'args': ['-s', item, '-p', 'tcp', '--dport', iptables_dns_port | string, '-j', 'ACCEPT']
-          },
-          {
-            'chain': 'OUTPUT',
-            'args': ['-d', item, '-p', 'tcp', '--sport', iptables_dns_port | string, '-j', 'ACCEPT']
+            'args': ['-m', 'set', '--match-set', iptables_ipset_dns_time_clients_name, 'src', '-p', 'tcp', '--dport', iptables_dns_port | string, '-j', 'ACCEPT']
           },
           {
             'chain': 'INPUT',
-            'args': ['-s', item, '-p', 'udp', '--dport', iptables_dns_port | string, '-j', 'ACCEPT']
-          },
-          {
-            'chain': 'OUTPUT',
-            'args': ['-d', item, '-p', 'udp', '--sport', iptables_dns_port | string, '-j', 'ACCEPT']
+            'args': ['-m', 'set', '--match-set', iptables_ipset_dns_time_clients_name, 'src', '-p', 'udp', '--dport', iptables_dns_port | string, '-j', 'ACCEPT']
           },
           {
             'chain': 'INPUT',
-            'args': ['-s', item, '-p', 'udp', '--dport', iptables_time_port | string, '-j', 'ACCEPT']
-          },
-          {
-            'chain': 'OUTPUT',
-            'args': ['-d', item, '-p', 'udp', '--sport', iptables_time_port | string, '-j', 'ACCEPT']
+            'args': ['-m', 'set', '--match-set', iptables_ipset_dns_time_clients_name, 'src', '-p', 'udp', '--dport', iptables_time_port | string, '-j', 'ACCEPT']
           }
         ]
       }}
-  loop: "{{ iptables_dns_time_client_sources }}"
+  loop: "{{ [iptables_ipset_dns_time_clients_name] }}"
+  when:
+    - iptables_local_ip in iptables_dns_time_server_ips
+    - iptables_dns_time_effective_client_sources | length > 0
   tags:
     - iptables
 
@@ -601,31 +594,19 @@
         + [
           {
             'chain': 'OUTPUT',
-            'args': ['-d', item, '-p', 'tcp', '--dport', iptables_dns_port | string, '-j', 'ACCEPT']
-          },
-          {
-            'chain': 'INPUT',
-            'args': ['-s', item, '-p', 'tcp', '--sport', iptables_dns_port | string, '-j', 'ACCEPT']
+            'args': ['-m', 'set', '--match-set', iptables_ipset_dns_time_servers_name, 'dst', '-p', 'tcp', '--dport', iptables_dns_port | string, '-j', 'ACCEPT']
           },
           {
             'chain': 'OUTPUT',
-            'args': ['-d', item, '-p', 'udp', '--dport', iptables_dns_port | string, '-j', 'ACCEPT']
-          },
-          {
-            'chain': 'INPUT',
-            'args': ['-s', item, '-p', 'udp', '--sport', iptables_dns_port | string, '-j', 'ACCEPT']
+            'args': ['-m', 'set', '--match-set', iptables_ipset_dns_time_servers_name, 'dst', '-p', 'udp', '--dport', iptables_dns_port | string, '-j', 'ACCEPT']
           },
           {
             'chain': 'OUTPUT',
-            'args': ['-d', item, '-p', 'udp', '--dport', iptables_time_port | string, '-j', 'ACCEPT']
-          },
-          {
-            'chain': 'INPUT',
-            'args': ['-s', item, '-p', 'udp', '--sport', iptables_time_port | string, '-j', 'ACCEPT']
+            'args': ['-m', 'set', '--match-set', iptables_ipset_dns_time_servers_name, 'dst', '-p', 'udp', '--dport', iptables_time_port | string, '-j', 'ACCEPT']
           }
         ]
       }}
-  loop: "{{ iptables_dns_time_server_ips }}"
+  loop: "{{ [iptables_ipset_dns_time_servers_name] }}"
   tags:
     - iptables
 
@@ -644,7 +625,9 @@
           {
             'chain': 'INPUT',
             'args': [
-              '-s', item,
+              '-m', 'set',
+              '--match-set', iptables_ipset_ssh_sources_name,
+              'src',
               '-p', 'tcp',
               '--dport', iptables_ssh_port | string,
               '-m', 'conntrack',
@@ -652,22 +635,117 @@
               '-j', 'ACCEPT'
             ]
           },
-          {
-            'chain': 'OUTPUT',
-            'args': [
-              '-d', item,
-              '-p', 'tcp',
-              '--sport', iptables_ssh_port | string,
-              '-m', 'conntrack',
-              '--ctstate', 'ESTABLISHED',
-              '-j', 'ACCEPT'
-            ]
-          }
         ]
       }}
-  loop: "{{ iptables_ssh_remote_whitelist_ips }}"
+  loop: "{{ [iptables_ipset_ssh_sources_name] }}"
   tags:
     - iptables
+
+- name: Build common iptables managed ipset definitions
+  ansible.builtin.set_fact:
+    iptables_managed_ipsets: >-
+      {{
+        (
+          [
+            iptables_ipset_ssh_sources_name,
+            iptables_ipset_dns_time_servers_name
+          ]
+          + ([iptables_ipset_dns_time_clients_name] if (iptables_local_ip in iptables_dns_time_server_ips and iptables_dns_time_effective_client_sources | length > 0) else [])
+          + ([iptables_ipset_zabbix_servers_name] if (iptables_local_ip not in iptables_zabbix_server_ips) else [])
+          + ([iptables_ipset_zabbix_agents_name] if (iptables_local_ip in iptables_zabbix_server_ips) else [])
+          + (iptables_external_service_ipset_rules | map(attribute='ipset_name') | list)
+          + (iptables_inbound_service_ipset_rules | map(attribute='ipset_name') | list)
+          + (iptables_per_ip_port_ipset_rules | map(attribute='ipset_name') | list)
+        )
+        | unique
+      }}
+  tags:
+    - iptables
+    - iptables_primary
+
+- name: Add common iptables SSH source ipset entries
+  ansible.builtin.set_fact:
+    iptables_managed_ipset_entries: "{{ iptables_managed_ipset_entries + [{'set_name': iptables_ipset_ssh_sources_name, 'ip': item}] }}"
+  loop: "{{ iptables_ssh_remote_whitelist_ips | unique }}"
+  tags:
+    - iptables
+    - iptables_primary
+
+- name: Add common iptables DNS/time server ipset entries
+  ansible.builtin.set_fact:
+    iptables_managed_ipset_entries: "{{ iptables_managed_ipset_entries + [{'set_name': iptables_ipset_dns_time_servers_name, 'ip': item}] }}"
+  loop: "{{ iptables_dns_time_server_ips | unique }}"
+  tags:
+    - iptables
+    - iptables_primary
+
+- name: Add common iptables DNS/time client ipset entries
+  ansible.builtin.set_fact:
+    iptables_managed_ipset_entries: "{{ iptables_managed_ipset_entries + [{'set_name': iptables_ipset_dns_time_clients_name, 'ip': item}] }}"
+  loop: "{{ iptables_dns_time_effective_client_sources | unique }}"
+  when: iptables_local_ip in iptables_dns_time_server_ips
+  tags:
+    - iptables
+    - iptables_primary
+
+- name: Add common iptables Zabbix server ipset entries
+  ansible.builtin.set_fact:
+    iptables_managed_ipset_entries: "{{ iptables_managed_ipset_entries + [{'set_name': iptables_ipset_zabbix_servers_name, 'ip': item}] }}"
+  loop: "{{ iptables_zabbix_server_ips | unique }}"
+  when: iptables_local_ip not in iptables_zabbix_server_ips
+  tags:
+    - iptables
+    - iptables_zabbix
+
+- name: Add common iptables Zabbix agent ipset entries
+  ansible.builtin.set_fact:
+    iptables_managed_ipset_entries: "{{ iptables_managed_ipset_entries + [{'set_name': iptables_ipset_zabbix_agents_name, 'ip': item}] }}"
+  loop: "{{ iptables_zabbix_agent_ips | unique }}"
+  when: iptables_local_ip in iptables_zabbix_server_ips
+  tags:
+    - iptables
+    - iptables_zabbix
+
+- name: Add common iptables external service ipset entries
+  ansible.builtin.set_fact:
+    iptables_managed_ipset_entries: "{{ iptables_managed_ipset_entries + [{'set_name': item.0.ipset_name, 'ip': item.1}] }}"
+  loop: "{{ iptables_external_service_ipset_rules | subelements('ips') }}"
+  tags:
+    - iptables
+    - iptables_primary
+
+- name: Add common iptables inbound service ipset entries
+  ansible.builtin.set_fact:
+    iptables_managed_ipset_entries: "{{ iptables_managed_ipset_entries + [{'set_name': item.0.ipset_name, 'ip': item.1}] }}"
+  loop: "{{ iptables_inbound_service_ipset_rules | subelements('source_ips') }}"
+  tags:
+    - iptables
+    - iptables_primary
+
+- name: Add common iptables per-IP port ipset entries
+  ansible.builtin.set_fact:
+    iptables_managed_ipset_entries: "{{ iptables_managed_ipset_entries + [{'set_name': item.ipset_name, 'ip': item.ip}] }}"
+  loop: "{{ iptables_per_ip_port_ipset_rules }}"
+  tags:
+    - iptables
+    - iptables_primary
+
+- name: Deduplicate common iptables managed ipset entries
+  ansible.builtin.set_fact:
+    iptables_managed_ipset_entries: "{{ iptables_managed_ipset_entries | unique }}"
+  tags:
+    - iptables
+    - iptables_primary
+    - iptables_zabbix
+
+- name: Apply common iptables ipsets
+  ansible.builtin.include_tasks: ipsets.yml
+  when: iptables_manage_ipsets | bool
+  tags:
+    - iptables
+    - iptables_primary
+    - iptables_zabbix
+    - iptables_ipsets
 
 - name: Build primary iptables allow rules
   ansible.builtin.set_fact:
@@ -715,3 +793,12 @@
   tags:
     - iptables
     - iptables_primary
+
+- name: Save common iptables and ipsets for netfilter-persistent
+  ansible.builtin.include_tasks: save.yml
+  tags:
+    - iptables
+    - iptables_primary
+    - iptables_zabbix
+    - iptables_ipsets
+    - iptables_save

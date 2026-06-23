@@ -44,3 +44,12 @@ Ansible/repo/prerequisite/
 The role copies them to `ANSIBLE_PREREQUISITE_REPO_DEST` on the target and runs
 `apt-get install` from that directory.
 
+`scripts/build-offline-bundle.sh` can download prerequisite `.deb` packages
+into `Ansible/repo/prerequisite/` before packaging the bundle. Configure these
+in `env.d/90-offline-bundle.env`:
+
+```env
+ANSIBLE_PREREQUISITE_DOWNLOAD_PACKAGES=true
+ANSIBLE_PREREQUISITE_DOWNLOAD_IMAGE=ubuntu:24.04
+ANSIBLE_PREREQUISITE_OFFLINE_PACKAGES="apt-transport-https ca-certificates curl gnupg ipset ipset-persistent iptables-persistent lsb-release net-tools netfilter-persistent openssh-client python3 python3-apt python3-pip rsync sshpass telnet traceroute unzip vim wget"
+```

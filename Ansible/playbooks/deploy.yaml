@@ -56,6 +56,7 @@
   tags:
     - iptable
     - iptables
+    - iptables_save
 
 - name: Block common iptables INPUT and OUTPUT
   hosts: "{{ lookup('env', 'ANSIBLE_IPTABLES_TARGET_GROUP') | default('iptables_targets', true) }}"
@@ -70,9 +71,11 @@
       tags:
         - iptable_block
         - iptables_block
+        - iptables_save
   tags:
     - iptable_block
     - iptables_block
+    - iptables_save
 
 - name: Install Zabbix server
   hosts: "{{ lookup('env', 'ANSIBLE_ZABBIX_SERVER_TARGET_GROUP') | default('zabbix_server_targets', true) }}"
@@ -247,13 +250,17 @@
       when: docker_swarm_manage_iptables | bool
       tags:
         - docker_swarm_iptables
+        - docker_swarm_iptables_ipsets
         - docker_swarm_iptables_nodes
         - docker_swarm_iptables_allow_connect_in
         - docker_swarm_iptables_allow_connect_out
         - docker_swarm_iptables_docker_user_drop
+        - docker_swarm_iptables_save
   tags:
     - docker_swarm_iptables
+    - docker_swarm_iptables_ipsets
     - docker_swarm_iptables_nodes
     - docker_swarm_iptables_allow_connect_in
     - docker_swarm_iptables_allow_connect_out
     - docker_swarm_iptables_docker_user_drop
+    - docker_swarm_iptables_save

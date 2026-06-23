@@ -1,0 +1,43 @@
+---
+- name: Create Docker Swarm ipsets
+  ansible.builtin.command:
+    argv:
+      - ipset
+      - create
+      - "{{ item }}"
+      - hash:ip
+      - -exist
+  changed_when: false
+  loop: "{{ docker_swarm_managed_ipsets }}"
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - docker_swarm_iptables_ipsets
+
+- name: Flush Docker Swarm managed ipsets before reloading entries
+  ansible.builtin.command:
+    argv:
+      - ipset
+      - flush
+      - "{{ item }}"
+  changed_when: true
+  loop: "{{ docker_swarm_managed_ipsets }}"
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - docker_swarm_iptables_ipsets
+
+- name: Add Docker Swarm IPs to managed ipsets
+  ansible.builtin.command:
+    argv:
+      - ipset
+      - add
+      - "{{ item.set_name }}"
+      - "{{ item.ip }}"
+      - -exist
+  changed_when: true
+  loop: "{{ docker_swarm_managed_ipset_entries | unique }}"
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - docker_swarm_iptables_ipsets

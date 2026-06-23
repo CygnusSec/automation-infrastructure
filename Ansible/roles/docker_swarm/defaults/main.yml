@@ -11,6 +11,19 @@ docker_swarm_manager_addr: ""
 
 docker_swarm_manage_iptables: false
 docker_swarm_manage_encrypted_overlay_esp: false
+docker_swarm_manage_ipsets: true
+docker_swarm_ipset_persist: true
+docker_swarm_ipset_save_path: /etc/iptables/ipsets
+docker_swarm_iptables_persist: true
+docker_swarm_iptables_save_path: /etc/iptables/rules.v4
+docker_swarm_ipset_prefix: swarm
+docker_swarm_ipset_managers_name: swarm_managers
+docker_swarm_ipset_nodes_name: swarm_nodes
+docker_swarm_ipset_service_clients_name: app_clients
+docker_swarm_ipset_logger_name: syslog_nodes
+docker_swarm_external_service_ipset_names:
+  database: mysql_nodes
+  storage: minio_nodes
 docker_swarm_service_allowed_source_ips: []
 docker_swarm_service_host_interface: ""
 docker_swarm_service_bridge_interface: docker_gwbridge

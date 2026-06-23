@@ -1,0 +1,43 @@
+---
+- name: Create common iptables ipsets
+  ansible.builtin.command:
+    argv:
+      - ipset
+      - create
+      - "{{ item }}"
+      - hash:ip
+      - -exist
+  changed_when: false
+  loop: "{{ iptables_managed_ipsets }}"
+  tags:
+    - iptables
+    - iptables_primary
+    - iptables_ipsets
+
+- name: Flush common iptables managed ipsets before reloading entries
+  ansible.builtin.command:
+    argv:
+      - ipset
+      - flush
+      - "{{ item }}"
+  changed_when: true
+  loop: "{{ iptables_managed_ipsets }}"
+  tags:
+    - iptables
+    - iptables_primary
+    - iptables_ipsets
+
+- name: Add IPs to common iptables managed ipsets
+  ansible.builtin.command:
+    argv:
+      - ipset
+      - add
+      - "{{ item.set_name }}"
+      - "{{ item.ip }}"
+      - -exist
+  changed_when: true
+  loop: "{{ iptables_managed_ipset_entries | unique }}"
+  tags:
+    - iptables
+    - iptables_primary
+    - iptables_ipsets

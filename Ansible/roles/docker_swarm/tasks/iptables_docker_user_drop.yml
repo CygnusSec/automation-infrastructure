@@ -1,15 +1,13 @@
 ---
 - name: Remove Docker Swarm DOCKER-USER return rule before drop
-  ansible.builtin.command:
-    argv:
-      - iptables
-      - -D
-      - DOCKER-USER
-      - -j
-      - RETURN
+  ansible.builtin.shell: |
+    while iptables -C DOCKER-USER -j RETURN 2>/dev/null; do
+      iptables -D DOCKER-USER -j RETURN
+    done
+  args:
+    executable: /bin/bash
   register: docker_swarm_iptables_docker_user_return_delete
-  changed_when: docker_swarm_iptables_docker_user_return_delete.rc == 0
-  failed_when: false
+  changed_when: false
   when: docker_swarm_docker_user_drop_enabled | bool
   tags:
     - docker_swarm

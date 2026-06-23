@@ -5,6 +5,18 @@ iptables_reset_enabled: true
 iptables_reset_chains:
   - INPUT
   - OUTPUT
+iptables_manage_ipsets: true
+iptables_ipset_persist: true
+iptables_ipset_save_path: /etc/iptables/ipsets
+iptables_persist: true
+iptables_save_path: /etc/iptables/rules.v4
+iptables_ipset_prefix: common
+iptables_ipset_ssh_sources_name: common_ssh_sources
+iptables_ipset_service_sources_name: common_service_sources
+iptables_ipset_dns_time_servers_name: common_dns_time_servers
+iptables_ipset_dns_time_clients_name: common_dns_time_clients
+iptables_ipset_zabbix_servers_name: common_zabbix_servers
+iptables_ipset_zabbix_agents_name: common_zabbix_agents
 iptables_ssh_whitelist_ips_raw: ""
 iptables_ssh_port: 22
 iptables_service_allowed_source_ips: []
@@ -21,4 +33,5 @@ iptables_time_port: 123
 iptables_block_enabled: false
 iptables_block_chains:
   - INPUT
+  - FORWARD
   - OUTPUT

@@ -1,4 +1,18 @@
 ---
+- name: Remove Docker Swarm DOCKER-USER return rule before allow rules
+  ansible.builtin.shell: |
+    while iptables -C DOCKER-USER -j RETURN 2>/dev/null; do
+      iptables -D DOCKER-USER -j RETURN
+    done
+  args:
+    executable: /bin/bash
+  register: docker_swarm_iptables_docker_user_return_delete_before_allow
+  changed_when: false
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - docker_swarm_iptables_allow_connect_in
+
 - name: Remove existing Docker Swarm allow connect in DOCKER-USER rules before reinserting
   ansible.builtin.command:
     argv: "{{ ['iptables', '-D', item.chain] + item.args }}"
@@ -25,7 +39,15 @@
 
 - name: Allow inbound access to Swarm services
   ansible.builtin.command:
-    argv: "{{ ['iptables', '-A', item.item.chain] + item.item.args }}"
+    argv: >-
+      {{
+        (
+          ['iptables', '-I', item.item.chain, '1']
+          if item.item.args == ['-m', 'conntrack', '--ctstate', 'ESTABLISHED,RELATED', '-j', 'ACCEPT']
+          else ['iptables', '-A', item.item.chain]
+        )
+        + item.item.args
+      }}
   changed_when: true
   loop: "{{ docker_swarm_iptables_allow_connect_in_check.results }}"
   when: item.rc != 0
