@@ -82,8 +82,6 @@ This applies:
 - `DOCKER-USER` allow connect in
 - `DOCKER-USER` allow connect out
 - logger rules
-- final `DOCKER-USER DROP`
-- Swarm iptables/ipset save tasks
 
 If debugging, the sub-task order is:
 
@@ -92,18 +90,15 @@ If debugging, the sub-task order is:
 ./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_nodes
 ./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_allow_connect_in
 ./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_allow_connect_out
-./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_docker_user_drop
-./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_save
 ```
 
 ## 5. Save Rules Explicitly
 
-The allow tasks already save rules when persistence is enabled. Run these tags
-again only when you need to save the current runtime state manually.
+Save is explicit. Run these tags only when you need to save the current runtime
+state manually.
 
 ```bash
 ./scripts/run-ansible.sh deploy --tags iptables_save
-./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_save
 ```
 
 Saved files:
@@ -178,4 +173,3 @@ Check that:
 - `DOCKER-USER` removes Docker's default `RETURN` before final `DROP`
 - ipsets are restored before iptables rules after reboot
 - `/etc/iptables/ipsets` and `/etc/iptables/rules.v4` exist
-

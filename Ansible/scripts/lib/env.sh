@@ -37,7 +37,7 @@ load_ansible_env() {
   env_file_for_tag() {
     local tag="$1"
     case "${tag}" in
-      base|prerequisite|docker|installation_cleanup|iptable|iptables|iptables_primary|iptables_zabbix|iptables_ipsets|iptables_save|iptable_block|iptables_block|mariadb_remove|openresty_remove|apache2_remove)
+      base|prerequisite|docker|installation_cleanup|kesl_stop|kesl_start|kesl_enable|iptable|iptables|iptables_primary|iptables_zabbix|iptables_ipsets|iptables_save|iptable_accept|iptables_accept|iptable_block|iptables_block|mariadb_remove|openresty_remove|apache2_remove)
         printf '%s\n' "20-base.env"
         ;;
       hostname|network)
@@ -52,7 +52,7 @@ load_ansible_env() {
       external_disk)
         printf '%s\n' "50-external-disk.env"
         ;;
-      docker_swarm|docker_swarm_iptables|docker_swarm_iptables_ipsets|docker_swarm_iptables_nodes|docker_swarm_iptables_allow_connect_in|docker_swarm_iptables_allow_connect_out|docker_swarm_iptables_docker_user_drop|docker_swarm_iptables_save|docker_swarm_labels|docker_swarm_reset|docker_swarm_leave)
+      docker_swarm|docker_swarm_iptables|docker_swarm_iptables_ipsets|docker_swarm_iptables_nodes|docker_swarm_iptables_allow_connect_in|docker_swarm_iptables_allow_connect_out|docker_swarm_labels|docker_swarm_reset|docker_swarm_leave)
         printf '%s\n' "60-docker-swarm.env"
         ;;
       tldh_database)

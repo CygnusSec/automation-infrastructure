@@ -67,14 +67,43 @@
   tags:
     - iptable
     - iptables
-    - iptables_save
 
-- name: Block common iptables INPUT and OUTPUT
+- name: Save common iptables and ipsets
   hosts: "{{ lookup('env', 'ANSIBLE_IPTABLES_TARGET_GROUP') | default('iptables_targets', true) }}"
   gather_facts: false
   become: true
   tasks:
-    - name: Block iptables INPUT and OUTPUT chains
+    - name: Save common iptables and ipsets for netfilter-persistent
+      ansible.builtin.include_role:
+        name: iptables
+        tasks_from: save
+      tags:
+        - iptables_save
+  tags:
+    - iptables_save
+
+- name: Accept common iptables INPUT and OUTPUT policies
+  hosts: "{{ lookup('env', 'ANSIBLE_IPTABLES_TARGET_GROUP') | default('iptables_targets', true) }}"
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Accept iptables INPUT and OUTPUT policies
+      ansible.builtin.include_role:
+        name: iptables
+        tasks_from: accept
+      tags:
+        - iptable_accept
+        - iptables_accept
+  tags:
+    - iptable_accept
+    - iptables_accept
+
+- name: Block common iptables INPUT and OUTPUT policies
+  hosts: "{{ lookup('env', 'ANSIBLE_IPTABLES_TARGET_GROUP') | default('iptables_targets', true) }}"
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Block iptables INPUT and OUTPUT policies
       ansible.builtin.include_role:
         name: iptables
         tasks_from: block
@@ -82,11 +111,9 @@
       tags:
         - iptable_block
         - iptables_block
-        - iptables_save
   tags:
     - iptable_block
     - iptables_block
-    - iptables_save
 
 - name: Apply targeted package updates
   hosts: "{{ lookup('env', 'ANSIBLE_PACKAGE_UPDATE_TARGET_GROUP') | default('package_update_targets', true) }}"
@@ -147,6 +174,51 @@
   tags:
     - never
     - installation_cleanup
+
+- name: Stop KESL service
+  hosts: "{{ lookup('env', 'ANSIBLE_KESL_STOP_TARGET_GROUP') | default('all_targets', true) }}"
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Stop kesl service
+      ansible.builtin.systemd:
+        name: kesl
+        state: stopped
+      failed_when: false
+      tags:
+        - kesl_stop
+  tags:
+    - kesl_stop
+
+- name: Start KESL service
+  hosts: "{{ lookup('env', 'ANSIBLE_KESL_START_TARGET_GROUP') | default('all_targets', true) }}"
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Start kesl service
+      ansible.builtin.systemd:
+        name: kesl
+        state: started
+      failed_when: false
+      tags:
+        - kesl_start
+  tags:
+    - kesl_start
+
+- name: Enable KESL service
+  hosts: "{{ lookup('env', 'ANSIBLE_KESL_ENABLE_TARGET_GROUP') | default('all_targets', true) }}"
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Enable kesl service
+      ansible.builtin.systemd:
+        name: kesl
+        enabled: true
+      failed_when: false
+      tags:
+        - kesl_enable
+  tags:
+    - kesl_enable
 
 - name: Install Zabbix server
   hosts: "{{ lookup('env', 'ANSIBLE_ZABBIX_SERVER_TARGET_GROUP') | default('zabbix_server_targets', true) }}"
@@ -391,13 +463,9 @@
         - docker_swarm_iptables_nodes
         - docker_swarm_iptables_allow_connect_in
         - docker_swarm_iptables_allow_connect_out
-        - docker_swarm_iptables_docker_user_drop
-        - docker_swarm_iptables_save
   tags:
     - docker_swarm_iptables
     - docker_swarm_iptables_ipsets
     - docker_swarm_iptables_nodes
     - docker_swarm_iptables_allow_connect_in
     - docker_swarm_iptables_allow_connect_out
-    - docker_swarm_iptables_docker_user_drop
-    - docker_swarm_iptables_save

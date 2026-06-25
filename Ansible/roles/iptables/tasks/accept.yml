@@ -1,0 +1,39 @@
+---
+- name: Validate iptables accept chains
+  ansible.builtin.assert:
+    that:
+      - iptables_accept_chains is sequence
+      - iptables_accept_chains | length > 0
+      - item in ['INPUT', 'OUTPUT']
+    fail_msg: "iptables_accept_chains only supports INPUT and OUTPUT: {{ item }}"
+  loop: "{{ iptables_accept_chains }}"
+  tags:
+    - iptable_accept
+    - iptables_accept
+
+- name: Check iptables chain policies before accept
+  ansible.builtin.command:
+    argv:
+      - iptables
+      - -S
+      - "{{ item }}"
+  register: iptables_accept_policy_check
+  changed_when: false
+  loop: "{{ iptables_accept_chains | unique }}"
+  tags:
+    - iptable_accept
+    - iptables_accept
+
+- name: Accept iptables INPUT and OUTPUT policies
+  ansible.builtin.command:
+    argv:
+      - iptables
+      - -P
+      - "{{ item.item }}"
+      - ACCEPT
+  changed_when: true
+  loop: "{{ iptables_accept_policy_check.results }}"
+  when: ("-P " ~ item.item ~ " ACCEPT") not in item.stdout_lines
+  tags:
+    - iptable_accept
+    - iptables_accept

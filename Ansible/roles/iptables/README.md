@@ -17,6 +17,7 @@ ANSIBLE_IPTABLES_IPSET_SAVE_PATH=/etc/iptables/ipsets
 ANSIBLE_IPTABLES_PERSIST=true
 ANSIBLE_IPTABLES_SAVE_PATH=/etc/iptables/rules.v4
 ANSIBLE_IPTABLES_IPSET_PREFIX=common
+ANSIBLE_IPTABLES_IPSET_SSH_TARGETS_NAME=common_ssh_targets
 ANSIBLE_IPTABLES_SSH_WHITELIST_IPS="172.16.3.21,172.16.3.22"
 ANSIBLE_IPTABLES_SSH_PORT=22
 ANSIBLE_IPTABLES_SERVICE_ALLOWED_SOURCE_IPS="[]"
@@ -31,7 +32,7 @@ ANSIBLE_IPTABLES_DNS_TIME_CLIENT_SOURCES="[]"
 ANSIBLE_IPTABLES_DNS_PORT=53
 ANSIBLE_IPTABLES_TIME_PORT=123
 ANSIBLE_IPTABLES_BLOCK_ENABLED=false
-ANSIBLE_IPTABLES_BLOCK_CHAINS="[INPUT, FORWARD, OUTPUT]"
+ANSIBLE_IPTABLES_BLOCK_CHAINS="[INPUT, OUTPUT]"
 ```
 
 Set the target hosts in `env.d/10-inventory.env`:
@@ -47,7 +48,8 @@ Run only this role:
 ```
 
 Run only primary allow rules (`lo`, established traffic, SSH, DNS/time, and
-non-Swarm service rules such as `443`):
+non-Swarm service rules such as `443`). SSH whitelist hosts are also allowed to
+open outbound SSH to the other iptables target hosts:
 
 ```bash
 ./scripts/run-ansible.sh deploy --tags iptables_primary
@@ -65,14 +67,22 @@ Save the current ipset and iptables state only:
 ./scripts/run-ansible.sh deploy --tags iptables_save
 ```
 
-The singular alias also works:
+Set only `INPUT` and `OUTPUT` policies to `ACCEPT`. This task does not apply
+rules and does not save:
+
+```bash
+./scripts/run-ansible.sh deploy --tags iptables_accept
+```
+
+The singular alias for the main iptables role also works:
 
 ```bash
 ./scripts/run-ansible.sh deploy --tags iptable
 ```
 
-Block `INPUT`, `FORWARD`, and `OUTPUT` as a separate task after allow rules are
-in place:
+Block `INPUT` and `OUTPUT` as a separate task after allow rules are in place.
+This task does not run `iptables_save`; run `iptables_save` explicitly if you
+want to persist the current state:
 
 ```bash
 ./scripts/run-ansible.sh deploy --tags iptables_block

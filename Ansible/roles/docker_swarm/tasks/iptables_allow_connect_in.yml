@@ -1,13 +1,43 @@
 ---
-- name: Remove Docker Swarm DOCKER-USER return rule before allow rules
+- name: Remove stale Docker Swarm allow connect in DOCKER-USER rules
   ansible.builtin.shell: |
-    while iptables -C DOCKER-USER -j RETURN 2>/dev/null; do
-      iptables -D DOCKER-USER -j RETURN
-    done
+    changed=0
+    bridge={{ docker_swarm_service_bridge_interface | quote }}
+    host_interface={{ docker_swarm_service_host_interface | quote }}
+    managed_sets_raw={{ (docker_swarm_docker_user_in_ipsets | default([]) | join(' ')) | quote }}
+    read -r -a managed_sets <<< "${managed_sets_raw}"
+
+    if [[ ${#managed_sets[@]} -gt 0 ]]; then
+      while IFS= read -r rule; do
+        [[ "${rule}" == -A\ DOCKER-USER* ]] || continue
+        [[ "${rule}" == *" -o ${bridge} "* ]] || continue
+        [[ "${rule}" == *" -j ACCEPT"* ]] || continue
+        [[ "${rule}" != *" -i ${host_interface} "* ]] || continue
+
+        managed=0
+        for set_name in "${managed_sets[@]}"; do
+          if [[ "${rule}" == *"--match-set ${set_name} "* ]]; then
+            managed=1
+            break
+          fi
+        done
+        [[ "${managed}" -eq 1 ]] || continue
+
+        delete_rule="${rule/#-A DOCKER-USER/-D DOCKER-USER}"
+        while iptables ${delete_rule} 2>/dev/null; do
+          changed=1
+        done
+      done < <(iptables -S DOCKER-USER)
+    fi
+
+    if [[ "${changed}" -eq 1 ]]; then
+      echo changed
+    fi
   args:
     executable: /bin/bash
-  register: docker_swarm_iptables_docker_user_return_delete_before_allow
-  changed_when: false
+  register: docker_swarm_iptables_stale_allow_connect_in_delete
+  changed_when: "'changed' in docker_swarm_iptables_stale_allow_connect_in_delete.stdout"
+  failed_when: false
   tags:
     - docker_swarm
     - docker_swarm_iptables
@@ -39,15 +69,7 @@
 
 - name: Allow inbound access to Swarm services
   ansible.builtin.command:
-    argv: >-
-      {{
-        (
-          ['iptables', '-I', item.item.chain, '1']
-          if item.item.args == ['-m', 'conntrack', '--ctstate', 'ESTABLISHED,RELATED', '-j', 'ACCEPT']
-          else ['iptables', '-A', item.item.chain]
-        )
-        + item.item.args
-      }}
+    argv: "{{ ['iptables', '-I', item.item.chain, '1'] + item.item.args }}"
   changed_when: true
   loop: "{{ docker_swarm_iptables_allow_connect_in_check.results }}"
   when: item.rc != 0

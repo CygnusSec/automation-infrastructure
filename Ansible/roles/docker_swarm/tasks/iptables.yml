@@ -97,21 +97,6 @@
     - docker_swarm_iptables
     - always
 
-- name: Add Docker Swarm base established rules
-  ansible.builtin.set_fact:
-    docker_swarm_iptables_rules: >-
-      {{
-        docker_swarm_iptables_rules
-        + [
-          {'chain': 'INPUT', 'args': ['-m', 'conntrack', '--ctstate', 'ESTABLISHED,RELATED', '-j', 'ACCEPT']},
-          {'chain': 'OUTPUT', 'args': ['-m', 'conntrack', '--ctstate', 'ESTABLISHED,RELATED', '-j', 'ACCEPT']}
-        ]
-      }}
-  tags:
-    - docker_swarm
-    - docker_swarm_iptables
-    - always
-
 - name: Add Docker Swarm manager join client rules
   ansible.builtin.set_fact:
     docker_swarm_iptables_rules: >-
@@ -352,24 +337,8 @@
 
 - name: Initialize Docker Swarm service DOCKER-USER rules
   ansible.builtin.set_fact:
-    docker_swarm_allow_connect_in_rules:
-      - chain: DOCKER-USER
-        args:
-          - -m
-          - conntrack
-          - --ctstate
-          - ESTABLISHED,RELATED
-          - -j
-          - ACCEPT
-    docker_swarm_allow_connect_out_rules:
-      - chain: DOCKER-USER
-        args:
-          - -m
-          - conntrack
-          - --ctstate
-          - ESTABLISHED,RELATED
-          - -j
-          - ACCEPT
+    docker_swarm_allow_connect_in_rules: []
+    docker_swarm_allow_connect_out_rules: []
   tags:
     - docker_swarm
     - docker_swarm_iptables
@@ -447,6 +416,34 @@
 - name: Deduplicate Docker Swarm managed ipset entries
   ansible.builtin.set_fact:
     docker_swarm_managed_ipset_entries: "{{ docker_swarm_managed_ipset_entries | unique }}"
+  tags:
+    - docker_swarm
+    - docker_swarm_iptables
+    - always
+
+- name: Build Docker Swarm managed DOCKER-USER ipset names
+  ansible.builtin.set_fact:
+    docker_swarm_docker_user_in_ipsets: >-
+      {{
+        (
+          [docker_swarm_ipset_service_clients_name]
+          if docker_swarm_service_allowed_source_ips | length > 0
+          else []
+        )
+        | unique
+      }}
+    docker_swarm_docker_user_out_ipsets: >-
+      {{
+        (
+          (docker_swarm_external_service_ipset_rules | map(attribute='ipset_name') | list)
+          + (
+            [docker_swarm_ipset_logger_name]
+            if docker_swarm_iptables_logger_ips | length > 0
+            else []
+          )
+        )
+        | unique
+      }}
   tags:
     - docker_swarm
     - docker_swarm_iptables
@@ -564,22 +561,3 @@
     - docker_swarm
     - docker_swarm_iptables
     - docker_swarm_iptables_allow_connect_out
-
-- name: Apply Docker Swarm DOCKER-USER drop rule
-  ansible.builtin.include_tasks: iptables_docker_user_drop.yml
-  tags:
-    - docker_swarm
-    - docker_swarm_iptables
-    - docker_swarm_iptables_docker_user_drop
-
-- name: Save Docker Swarm iptables and ipsets for netfilter-persistent
-  ansible.builtin.include_tasks: iptables_save.yml
-  tags:
-    - docker_swarm
-    - docker_swarm_iptables
-    - docker_swarm_iptables_ipsets
-    - docker_swarm_iptables_nodes
-    - docker_swarm_iptables_allow_connect_in
-    - docker_swarm_iptables_allow_connect_out
-    - docker_swarm_iptables_docker_user_drop
-    - docker_swarm_iptables_save

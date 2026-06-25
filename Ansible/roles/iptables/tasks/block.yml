@@ -4,8 +4,8 @@
     that:
       - iptables_block_chains is sequence
       - iptables_block_chains | length > 0
-      - item in ['INPUT', 'FORWARD', 'OUTPUT']
-    fail_msg: "iptables_block_chains only supports INPUT, FORWARD, and OUTPUT: {{ item }}"
+      - item in ['INPUT', 'OUTPUT']
+    fail_msg: "iptables_block_chains only supports INPUT and OUTPUT: {{ item }}"
   loop: "{{ iptables_block_chains }}"
   tags:
     - iptable_block
@@ -24,7 +24,7 @@
     - iptable_block
     - iptables_block
 
-- name: Block iptables INPUT, FORWARD, and OUTPUT chains
+- name: Block iptables INPUT and OUTPUT policies
   ansible.builtin.command:
     argv:
       - iptables
@@ -37,10 +37,3 @@
   tags:
     - iptable_block
     - iptables_block
-
-- name: Save blocked iptables policies for netfilter-persistent
-  ansible.builtin.include_tasks: save.yml
-  tags:
-    - iptable_block
-    - iptables_block
-    - iptables_save

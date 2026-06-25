@@ -19,6 +19,10 @@ def host_alias(prefix, ip):
     return f"{prefix}-{ip.replace('.', '-')}"
 
 
+def ip_alias(ip):
+    return ip
+
+
 def warn(message):
     print(f"inventory warning: {message}", file=sys.stderr)
 
@@ -207,31 +211,31 @@ def build_inventory():
     }
 
     for ip in all_target_hosts:
-        alias = ip_to_alias.get(ip, host_alias("target", ip))
+        alias = ip_alias(ip)
         add_host(inventory, "all_targets", alias, ip, advertise=False)
 
     for ip in iptables_hosts:
-        alias = ip_to_alias.get(ip, host_alias("iptables", ip))
+        alias = ip_alias(ip)
         add_host(inventory, "iptables_targets", alias, ip, advertise=False)
 
     for ip in package_update_hosts:
-        alias = ip_to_alias.get(ip, host_alias("package-update", ip))
+        alias = ip_alias(ip)
         add_host(inventory, "package_update_targets", alias, ip, advertise=False)
 
     for ip in openresty_remove_hosts:
-        alias = ip_to_alias.get(ip, host_alias("openresty-remove", ip))
+        alias = ip_alias(ip)
         add_host(inventory, "openresty_remove_targets", alias, ip, advertise=False)
 
     for ip in apache2_remove_hosts:
-        alias = ip_to_alias.get(ip, host_alias("apache2-remove", ip))
+        alias = ip_alias(ip)
         add_host(inventory, "apache2_remove_targets", alias, ip, advertise=False)
 
     for ip in zabbix_server_hosts:
-        alias = ip_to_alias.get(ip, host_alias("zabbix-server", ip))
+        alias = ip_alias(ip)
         add_host(inventory, "zabbix_server_targets", alias, ip, advertise=False)
 
     for ip in zabbix_hosts:
-        alias = ip_to_alias.get(ip, host_alias("zabbix-agent", ip))
+        alias = ip_alias(ip)
         add_host(inventory, "zabbix_agent_targets", alias, ip, advertise=False)
 
     set_group_vars(inventory, "linux", connection_vars(become=env_bool("ANSIBLE_BECOME", "true")))

@@ -14,10 +14,6 @@ run iptables management.
 ANSIBLE_DOCKER_SWARM_MANAGE_IPTABLES=true
 ANSIBLE_DOCKER_SWARM_MANAGE_ENCRYPTED_OVERLAY_ESP=true
 ANSIBLE_DOCKER_SWARM_MANAGE_IPSETS=true
-ANSIBLE_DOCKER_SWARM_IPSET_PERSIST=true
-ANSIBLE_DOCKER_SWARM_IPSET_SAVE_PATH=/etc/iptables/ipsets
-ANSIBLE_DOCKER_SWARM_IPTABLES_PERSIST=true
-ANSIBLE_DOCKER_SWARM_IPTABLES_SAVE_PATH=/etc/iptables/rules.v4
 ANSIBLE_DOCKER_SWARM_IPSET_MANAGERS_NAME=swarm_managers
 ANSIBLE_DOCKER_SWARM_IPSET_NODES_NAME=swarm_nodes
 ANSIBLE_DOCKER_SWARM_IPSET_SERVICE_CLIENTS_NAME=app_clients
@@ -51,8 +47,8 @@ with `app_clients`:
 iptables -A DOCKER-USER -m set --match-set app_clients src -i <host-interface> -o docker_gwbridge -p tcp -m multiport --dports <ports> -j ACCEPT
 ```
 
-The role inserts `ESTABLISHED,RELATED` rules, so it does not write separate
-reverse `--sports` rules.
+Reverse traffic is handled by the common iptables established/related rules;
+the Swarm role does not add generic INPUT/OUTPUT established rules.
 
 `ANSIBLE_DOCKER_SWARM_SERVICE_PORTS_BY_HOST` overrides
 `ANSIBLE_DOCKER_SWARM_SERVICE_PORTS` for matching node IPs.
@@ -62,13 +58,12 @@ Nodes with `node_tag=logger` allow every Swarm node IP to connect to the
 configured logger port, default `514/tcp` and `514/udp`.
 Every Swarm node also gets `DOCKER-USER` rules allowing Swarm container traffic
 to logger node IPs on the configured logger port.
-When `ANSIBLE_DOCKER_SWARM_DOCKER_USER_DROP_ENABLED=true`, the role appends
-`iptables -A DOCKER-USER -j DROP` after allow rules and removes Docker's
-default `iptables -D DOCKER-USER -j RETURN` first.
+The role does not manage generic `DOCKER-USER -j DROP` or
+`DOCKER-USER -j RETURN` rules because those affect non-Swarm Docker traffic too.
 
-When persistence is enabled, the task saves ipsets to `/etc/iptables/ipsets`
-and the final iptables state to `/etc/iptables/rules.v4`, so
-`netfilter-persistent` can restore both after reboot.
+This role does not persist firewall state. `iptables-save` and `ipset save`
+write the whole host state, including SSH/common rules, so they are not exposed
+as Docker Swarm tasks.
 
 External service IP/port lists for Swarm containers are also handled in
 `DOCKER-USER`:
@@ -92,8 +87,6 @@ Sub-task tags:
 ./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_ipsets
 ./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_allow_connect_in
 ./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_allow_connect_out
-./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_docker_user_drop
-./scripts/run-ansible.sh deploy --tags docker_swarm_iptables_save
 ```
 
 ## Opened Traffic
@@ -110,5 +103,3 @@ Sub-task tags:
   `ANSIBLE_DOCKER_SWARM_SERVICE_ALLOWED_SOURCE_IPS` is set
 - Swarm container access to external services through `DOCKER-USER` when
   `ANSIBLE_DOCKER_SWARM_EXTERNAL_SERVICE_RULES` is set
-- final `DOCKER-USER` drop rule when
-  `ANSIBLE_DOCKER_SWARM_DOCKER_USER_DROP_ENABLED=true`

@@ -12,6 +12,7 @@
   tags:
     - iptables
     - iptables_primary
+    - iptables_zabbix
     - iptables_ipsets
 
 - name: Flush common iptables managed ipsets before reloading entries
@@ -25,6 +26,7 @@
   tags:
     - iptables
     - iptables_primary
+    - iptables_zabbix
     - iptables_ipsets
 
 - name: Add IPs to common iptables managed ipsets
@@ -40,4 +42,5 @@
   tags:
     - iptables
     - iptables_primary
+    - iptables_zabbix
     - iptables_ipsets

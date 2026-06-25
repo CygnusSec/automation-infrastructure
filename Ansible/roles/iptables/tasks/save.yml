@@ -12,12 +12,6 @@
       enabled: "{{ iptables_persist | bool }}"
   when: item.enabled | bool
   tags:
-    - iptables
-    - iptables_primary
-    - iptables_zabbix
-    - iptables_ipsets
-    - iptable_block
-    - iptables_block
     - iptables_save
 
 - name: Validate netfilter-persistent restore plugins
@@ -31,12 +25,6 @@
   loop: "{{ iptables_persistent_plugin_checks.results | default([]) }}"
   when: item.item.enabled | bool
   tags:
-    - iptables
-    - iptables_primary
-    - iptables_zabbix
-    - iptables_ipsets
-    - iptable_block
-    - iptables_block
     - iptables_save
 
 - name: Save common ipsets for netfilter-persistent
@@ -46,12 +34,6 @@
   changed_when: true
   when: iptables_ipset_persist | bool
   tags:
-    - iptables
-    - iptables_primary
-    - iptables_zabbix
-    - iptables_ipsets
-    - iptable_block
-    - iptables_block
     - iptables_save
 
 - name: Save common iptables rules for netfilter-persistent
@@ -61,10 +43,4 @@
   changed_when: true
   when: iptables_persist | bool
   tags:
-    - iptables
-    - iptables_primary
-    - iptables_zabbix
-    - iptables_ipsets
-    - iptable_block
-    - iptables_block
     - iptables_save

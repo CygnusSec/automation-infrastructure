@@ -11,6 +11,7 @@
   tags:
     - iptables
     - iptables_primary
+    - iptables_zabbix
 
 - name: Validate iptables reset chains
   ansible.builtin.assert:
@@ -19,20 +20,6 @@
       - item in ['INPUT', 'OUTPUT']
     fail_msg: "iptables_reset_chains only supports INPUT and OUTPUT: {{ item }}"
   loop: "{{ iptables_reset_chains }}"
-  when: iptables_reset_enabled | bool
-  tags:
-    - iptables
-    - iptables_primary
-
-- name: Allow iptables INPUT and OUTPUT policies before reset
-  ansible.builtin.command:
-    argv:
-      - iptables
-      - -P
-      - "{{ item }}"
-      - ACCEPT
-  changed_when: true
-  loop: "{{ iptables_reset_chains | unique }}"
   when: iptables_reset_enabled | bool
   tags:
     - iptables
@@ -88,6 +75,7 @@
     - iptables
     - iptables_primary
     - iptables_ipsets
+    - iptables_zabbix
 
 - name: Validate ipset command when ipset management is enabled
   ansible.builtin.assert:
@@ -102,6 +90,7 @@
     - iptables
     - iptables_primary
     - iptables_ipsets
+    - iptables_zabbix
 
 - name: Validate legacy iptables service source whitelist is disabled
   ansible.builtin.assert:
@@ -249,6 +238,7 @@
     fail_msg: "Set valid Zabbix agent and server TCP ports."
   tags:
     - iptables
+    - iptables_zabbix
 
 - name: Validate iptables Zabbix server IPs
   ansible.builtin.assert:
@@ -258,6 +248,7 @@
   loop: "{{ iptables_zabbix_server_ips }}"
   tags:
     - iptables
+    - iptables_zabbix
 
 - name: Validate iptables DNS/time inputs
   ansible.builtin.assert:
@@ -303,6 +294,23 @@
           - lo
           - -j
           - ACCEPT
+    iptables_established_rules:
+      - chain: INPUT
+        args:
+          - -m
+          - conntrack
+          - --ctstate
+          - ESTABLISHED,RELATED
+          - -j
+          - ACCEPT
+      - chain: OUTPUT
+        args:
+          - -m
+          - conntrack
+          - --ctstate
+          - ESTABLISHED,RELATED
+          - -j
+          - ACCEPT
     iptables_base_rules:
       - chain: INPUT
         args:
@@ -335,6 +343,7 @@
   tags:
     - iptables
     - iptables_primary
+    - iptables_zabbix
 
 - name: Initialize iptables service rules
   ansible.builtin.set_fact:
@@ -350,6 +359,7 @@
   tags:
     - iptables
     - iptables_primary
+    - iptables_zabbix
 
 - name: Resolve iptables target IPs from target group
   ansible.builtin.set_fact:
@@ -520,10 +530,17 @@
         | reject('equalto', ansible_host | default(inventory_hostname))
         | list
       }}
+    iptables_ssh_target_ips: >-
+      {{
+        iptables_target_ips
+        | reject('equalto', iptables_local_ip)
+        | list
+      }}
     iptables_zabbix_agent_ips: []
   tags:
     - iptables
     - iptables_primary
+    - iptables_zabbix
 
 - name: Resolve iptables Zabbix agent IPs from target group
   ansible.builtin.set_fact:
@@ -538,6 +555,7 @@
   when: (hostvars[item].ansible_host | default(item)) not in iptables_zabbix_server_ips
   tags:
     - iptables
+    - iptables_zabbix
 
 - name: Initialize iptables per-IP port rules
   ansible.builtin.set_fact:
@@ -621,6 +639,7 @@
   when: iptables_local_ip not in iptables_zabbix_server_ips
   tags:
     - iptables
+    - iptables_zabbix
 
 - name: Add iptables Zabbix server polling rules
   ansible.builtin.set_fact:
@@ -647,6 +666,7 @@
   when: iptables_local_ip in iptables_zabbix_server_ips
   tags:
     - iptables
+    - iptables_zabbix
 
 - name: Initialize iptables DNS/time rules
   ansible.builtin.set_fact:
@@ -763,6 +783,34 @@
     - iptables
     - iptables_primary
 
+- name: Add iptables SSH outbound priority rules from whitelist hosts
+  ansible.builtin.set_fact:
+    iptables_ssh_priority_rules: >-
+      {{
+        iptables_ssh_priority_rules
+        + [
+          {
+            'chain': 'OUTPUT',
+            'args': [
+              '-m', 'set',
+              '--match-set', iptables_ipset_ssh_targets_name,
+              'dst',
+              '-p', 'tcp',
+              '--dport', iptables_ssh_port | string,
+              '-m', 'conntrack',
+              '--ctstate', 'NEW,ESTABLISHED',
+              '-j', 'ACCEPT'
+            ]
+          },
+        ]
+      }}
+  when:
+    - iptables_local_ip in iptables_ssh_whitelist_ips
+    - iptables_ssh_target_ips | length > 0
+  tags:
+    - iptables
+    - iptables_primary
+
 - name: Build common iptables managed ipset definitions
   ansible.builtin.set_fact:
     iptables_managed_ipsets: >-
@@ -771,6 +819,7 @@
           [
             iptables_ipset_ssh_sources_name,
           ]
+          + ([iptables_ipset_ssh_targets_name] if (iptables_local_ip in iptables_ssh_whitelist_ips and iptables_ssh_target_ips | length > 0) else [])
           + ([iptables_ipset_dns_time_servers_name] if (iptables_local_ip not in iptables_dns_time_server_ips) else [])
           + ([iptables_ipset_dns_time_clients_name] if (iptables_local_ip in iptables_dns_time_server_ips and iptables_dns_time_effective_client_sources | length > 0) else [])
           + ([iptables_ipset_zabbix_servers_name] if (iptables_local_ip not in iptables_zabbix_server_ips) else [])
@@ -789,6 +838,15 @@
   ansible.builtin.set_fact:
     iptables_managed_ipset_entries: "{{ iptables_managed_ipset_entries + [{'set_name': iptables_ipset_ssh_sources_name, 'ip': item}] }}"
   loop: "{{ iptables_ssh_remote_whitelist_ips | unique }}"
+  tags:
+    - iptables
+    - iptables_primary
+
+- name: Add common iptables SSH target ipset entries for whitelist hosts
+  ansible.builtin.set_fact:
+    iptables_managed_ipset_entries: "{{ iptables_managed_ipset_entries + [{'set_name': iptables_ipset_ssh_targets_name, 'ip': item}] }}"
+  loop: "{{ iptables_ssh_target_ips | unique }}"
+  when: iptables_local_ip in iptables_ssh_whitelist_ips
   tags:
     - iptables
     - iptables_primary
@@ -870,6 +928,21 @@
     - iptables_primary
     - iptables_zabbix
 
+- name: Ensure common iptables ipsets exist for all managed entries
+  ansible.builtin.set_fact:
+    iptables_managed_ipsets: >-
+      {{
+        (
+          iptables_managed_ipsets
+          + (iptables_managed_ipset_entries | map(attribute='set_name') | list)
+        )
+        | unique
+      }}
+  tags:
+    - iptables
+    - iptables_primary
+    - iptables_zabbix
+
 - name: Apply common iptables ipsets
   ansible.builtin.include_tasks: ipsets.yml
   when: iptables_manage_ipsets | bool
@@ -890,7 +963,7 @@
         + iptables_base_rules
         + iptables_ssh_priority_rules
       }}
-    iptables_priority_rules: "{{ iptables_loopback_rules + iptables_dns_time_rules + iptables_ssh_priority_rules }}"
+    iptables_priority_rules: "{{ iptables_loopback_rules + iptables_established_rules + iptables_dns_time_rules + iptables_ssh_priority_rules }}"
   tags:
     - iptables
     - iptables_primary
@@ -925,12 +998,3 @@
   tags:
     - iptables
     - iptables_primary
-
-- name: Save common iptables and ipsets for netfilter-persistent
-  ansible.builtin.include_tasks: save.yml
-  tags:
-    - iptables
-    - iptables_primary
-    - iptables_zabbix
-    - iptables_ipsets
-    - iptables_save
