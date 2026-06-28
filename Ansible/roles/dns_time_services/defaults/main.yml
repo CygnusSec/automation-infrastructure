@@ -37,6 +37,7 @@ time_server_container_name: time-server
 time_server_config_dir: "{{ dns_time_services_base_dir }}/chrony"
 time_server_command: "chronyd -d -f /etc/chrony/chrony.conf"
 time_server_extra_docker_args: "--cap-add SYS_TIME --cap-add SYS_NICE"
+time_server_timezone: Asia/Ho_Chi_Minh
 time_server_allow: []
 time_server_upstream_servers: []
 time_server_local_stratum: 10

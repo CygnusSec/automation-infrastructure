@@ -30,21 +30,19 @@ ANSIBLE_PACKAGE_UPDATE_REPO_SOURCE=./repo/update
 ANSIBLE_PACKAGE_UPDATE_REPO_DEST=/media/installation/update
 ANSIBLE_PACKAGE_UPDATE_CLEANUP_INSTALLATION_DIR=true
 ANSIBLE_PACKAGE_UPDATE_INSTALLATION_DIR=/media/installation
-ANSIBLE_PACKAGE_UPDATE_PACKAGES="[{name: libssl3t64}, {name: openssl}, {name: inetutils-telnet}, {name: telnet}, {name: vim}, {name: vim-common}, {name: vim-runtime}, {name: vim-tiny}, {name: xxd}]"
+ANSIBLE_PACKAGE_UPDATE_PACKAGES="[{name: vim, version: '2:9.1.0016-1ubuntu7.15'}, {name: vim-common, version: '2:9.1.0016-1ubuntu7.15'}, {name: vim-runtime, version: '2:9.1.0016-1ubuntu7.15'}, {name: vim-tiny, version: '2:9.1.0016-1ubuntu7.15'}, {name: xxd, version: '2:9.1.0016-1ubuntu7.15'}, {name: python3-pip, version: '24.0+dfsg-1ubuntu1.3+esm1'}, {name: python3-wheel, version: '0.42.0-2ubuntu0.1~esm1'}]"
 ```
 
 ## Current Package List
 
 ```text
-libssl3t64
-openssl
-inetutils-telnet
-telnet
-vim
-vim-common
-vim-runtime
-vim-tiny
-xxd
+vim=2:9.1.0016-1ubuntu7.15
+vim-common=2:9.1.0016-1ubuntu7.15
+vim-runtime=2:9.1.0016-1ubuntu7.15
+vim-tiny=2:9.1.0016-1ubuntu7.15
+xxd=2:9.1.0016-1ubuntu7.15
+python3-pip=24.0+dfsg-1ubuntu1.3+esm1
+python3-wheel=0.42.0-2ubuntu0.1~esm1
 ```
 
 ## Command
@@ -52,6 +50,12 @@ xxd
 ```bash
 cd Ansible
 ./scripts/run-ansible.sh deploy --tags package_update
+```
+
+For the same package set under the CVE remediation tag:
+
+```bash
+./scripts/run-ansible.sh deploy --tags cve_update
 ```
 
 ## Offline Notes
@@ -68,3 +72,5 @@ For each package entry without `version`, the role installs the highest local
 `.deb` version found in `repo/update`. After install, the role prints installed
 versions and clears every item under `ANSIBLE_PACKAGE_UPDATE_INSTALLATION_DIR`,
 default `/media/installation`.
+Entries with `+esm1` fixed versions require Ubuntu Pro/ESM packages to be
+present in `repo/update` before an offline run.

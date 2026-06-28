@@ -30,6 +30,7 @@ alphabetic order.
 | [OpenResty Native Package Remove](openresty-remove/README.md) | Stop and remove native `openresty` from selected targets. | `./scripts/run-ansible.sh deploy --tags openresty_remove` |
 | [Apache2 Native Package Remove](apache2-remove/README.md) | Stop and remove native Apache2 packages from selected targets. | `./scripts/run-ansible.sh deploy --tags apache2_remove` |
 | [Package Update](package-update/README.md) | Update selected Ubuntu packages to fixed versions. | `./scripts/run-ansible.sh deploy --tags package_update` |
+| [CVE Update](cve-update/README.md) | Install report-derived Ubuntu CVE package fixes offline. | `./scripts/run-ansible.sh deploy --tags cve_update` |
 | [Installation Cleanup](installation-cleanup/README.md) | Clean all contents under `/media/installation`. | `./scripts/run-ansible.sh deploy --tags installation_cleanup` |
 | [DNS And Time Services](dns-time-services/README.md) | Deploy DNS and time server containers together. | `./scripts/run-ansible.sh deploy --tags dns_time_services` |
 | [DNS Server](dns-server/README.md) | Deploy only the BIND DNS container. | `./scripts/run-ansible.sh deploy --tags dns_server` |

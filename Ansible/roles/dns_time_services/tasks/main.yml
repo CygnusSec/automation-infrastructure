@@ -137,6 +137,42 @@
     - dns_time_services
     - time_server
 
+- name: Record time server container timezone
+  ansible.builtin.copy:
+    content: "{{ time_server_timezone }}\n"
+    dest: "{{ time_server_config_dir }}/timezone"
+    owner: root
+    group: root
+    mode: "0644"
+  register: time_server_timezone_marker
+  when: time_server_enabled | bool
+  tags:
+    - dns_time_services
+    - time_server
+
+- name: Check time server timezone file on host
+  ansible.builtin.stat:
+    path: "/usr/share/zoneinfo/{{ time_server_timezone }}"
+  register: time_server_timezone_file
+  when:
+    - time_server_enabled | bool
+    - time_server_timezone | length > 0
+  tags:
+    - dns_time_services
+    - time_server
+
+- name: Validate time server timezone file on host
+  ansible.builtin.assert:
+    that:
+      - time_server_timezone_file.stat.exists
+    fail_msg: "Timezone file not found on host: /usr/share/zoneinfo/{{ time_server_timezone }}"
+  when:
+    - time_server_enabled | bool
+    - time_server_timezone | length > 0
+  tags:
+    - dns_time_services
+    - time_server
+
 - name: Check DNS Docker image
   ansible.builtin.command: docker image inspect "{{ dns_server_image }}"
   register: dns_server_image_check
@@ -390,7 +426,7 @@
   when:
     - time_server_enabled | bool
     - time_server_container_check.rc == 0
-    - time_server_chrony_conf.changed or (time_server_image_load is defined and time_server_image_load.changed)
+    - time_server_chrony_conf.changed or time_server_timezone_marker.changed or (time_server_image_load is defined and time_server_image_load.changed)
   tags:
     - dns_time_services
     - time_server
@@ -402,6 +438,10 @@
     --restart unless-stopped
     --network host
     {{ time_server_extra_docker_args }}
+    {% if time_server_timezone | length > 0 %}
+    -e TZ={{ time_server_timezone | quote }}
+    -v /usr/share/zoneinfo/{{ time_server_timezone }}:/etc/localtime:ro
+    {% endif %}
     --pull never
     -v {{ time_server_config_dir }}:/etc/chrony:ro
     {{ time_server_image }}
@@ -411,7 +451,7 @@
   changed_when: true
   when:
     - time_server_enabled | bool
-    - time_server_container_check.rc != 0 or time_server_chrony_conf.changed or (time_server_image_load is defined and time_server_image_load.changed)
+    - time_server_container_check.rc != 0 or time_server_chrony_conf.changed or time_server_timezone_marker.changed or (time_server_image_load is defined and time_server_image_load.changed)
   tags:
     - dns_time_services
     - time_server

@@ -55,4 +55,4 @@ env.d/90-offline-bundle.env  # online build/offline bundle settings
 | `external_disk` | `50-external-disk.env` |
 | `docker_swarm`, `docker_swarm_leave`, `docker_swarm_iptables`, `docker_swarm_iptables_ipsets`, `docker_swarm_iptables_nodes`, `docker_swarm_iptables_allow_connect_in`, `docker_swarm_iptables_allow_connect_out` | `60-docker-swarm.env` |
 | `tldh_database` | `70-tldh-database.env` |
-| `package_update` | `80-package-update.env` |
+| `package_update`, `cve_update` | `80-package-update.env` |

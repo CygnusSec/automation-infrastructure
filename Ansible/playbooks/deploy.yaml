@@ -115,15 +115,19 @@
     - iptable_block
     - iptables_block
 
-- name: Apply targeted package updates
+- name: Apply targeted package and CVE updates
   hosts: "{{ lookup('env', 'ANSIBLE_PACKAGE_UPDATE_TARGET_GROUP') | default('package_update_targets', true) }}"
   gather_facts: false
   become: true
   roles:
     - role: package_update
       when: package_update_enabled | bool
+      tags:
+        - package_update
+        - cve_update
   tags:
     - package_update
+    - cve_update
 
 - name: Clean installation staging directory
   hosts: "{{ lookup('env', 'ANSIBLE_INSTALLATION_CLEANUP_TARGET_GROUP') | default('all_targets', true) }}"

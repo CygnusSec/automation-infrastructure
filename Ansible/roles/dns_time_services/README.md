@@ -8,6 +8,16 @@ group.
 - DNS: BIND 9 container, default image `local/bind9:offline`
 - Time: Chrony container, default image `local/chrony:offline`
 
+The Chrony container timezone is controlled by:
+
+```env
+ANSIBLE_TIME_SERVER_TIMEZONE=Asia/Ho_Chi_Minh
+```
+
+The role passes this value as `TZ` and mounts the matching host zoneinfo file
+read-only into `/etc/localtime` inside the container. Changing the timezone
+recreates the time server container.
+
 ## Main Commands
 
 Deploy both services:
@@ -34,4 +44,3 @@ Deploy only time server:
 - [DNS And Time Services](../../docs/tasks/dns-time-services/README.md)
 - [DNS Server](../../docs/tasks/dns-server/README.md)
 - [Time Server](../../docs/tasks/time-server/README.md)
-
