@@ -181,6 +181,57 @@
   tags:
     - user_password
 
+- name: Configure Ubuntu logrotate size limit
+  hosts: "{{ lookup('env', 'ANSIBLE_LOGROTATE_SIZE_LIMIT_TARGET_GROUP') | default('all_targets', true) }}"
+  gather_facts: false
+  become: true
+  vars:
+    logrotate_size_limit_conf: "{{ lookup('env', 'ANSIBLE_LOGROTATE_SIZE_LIMIT_CONF') | default('/etc/logrotate.d/ansible-size-limit', true) }}"
+    logrotate_size_limit_size: "{{ lookup('env', 'ANSIBLE_LOGROTATE_SIZE_LIMIT_SIZE') | default('1G', true) }}"
+    logrotate_size_limit_paths: "{{ lookup('env', 'ANSIBLE_LOGROTATE_SIZE_LIMIT_PATHS') | default('[\"/var/log/*.log\", \"/var/log/syslog\", \"/var/log/messages\", \"/var/log/auth.log\", \"/var/log/kern.log\", \"/var/log/daemon.log\", \"/var/log/user.log\", \"/var/log/mail.log\", \"/var/log/audit/*.log\", \"/var/log/*/*.log\", \"/var/log/*/*/*.log\"]', true) | from_yaml }}"
+  tasks:
+    - name: Validate logrotate size limit inputs
+      ansible.builtin.assert:
+        that:
+          - logrotate_size_limit_conf | length > 0
+          - logrotate_size_limit_size is match('^[0-9]+[kMGT]?$')
+          - logrotate_size_limit_paths is sequence
+          - logrotate_size_limit_paths | length > 0
+        fail_msg: "Set valid ANSIBLE_LOGROTATE_SIZE_LIMIT_* values before running logrotate_size_limit."
+      tags:
+        - logrotate_size_limit
+
+    - name: Configure logrotate to delete logs at size limit
+      ansible.builtin.copy:
+        dest: "{{ logrotate_size_limit_conf }}"
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          # Managed by Ansible. Rotate and delete matching logs when they reach the size limit.
+          {{ logrotate_size_limit_paths | join('\n') }}
+          {
+              size {{ logrotate_size_limit_size }}
+              rotate 0
+              missingok
+              notifempty
+              copytruncate
+          }
+      tags:
+        - logrotate_size_limit
+
+    - name: Validate logrotate size limit configuration
+      ansible.builtin.command:
+        argv:
+          - logrotate
+          - --debug
+          - "{{ logrotate_size_limit_conf }}"
+      changed_when: false
+      tags:
+        - logrotate_size_limit
+  tags:
+    - logrotate_size_limit
+
 - name: Clean installation staging directory
   hosts: "{{ lookup('env', 'ANSIBLE_INSTALLATION_CLEANUP_TARGET_GROUP') | default('all_targets', true) }}"
   gather_facts: false
