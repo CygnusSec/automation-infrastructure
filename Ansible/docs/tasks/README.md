@@ -31,6 +31,7 @@ alphabetic order.
 | [Apache2 Native Package Remove](apache2-remove/README.md) | Stop and remove native Apache2 packages from selected targets. | `./scripts/run-ansible.sh deploy --tags apache2_remove` |
 | [Package Update](package-update/README.md) | Update selected Ubuntu packages to fixed versions. | `./scripts/run-ansible.sh deploy --tags package_update` |
 | [CVE Update](cve-update/README.md) | Install report-derived Ubuntu CVE package fixes offline. | `./scripts/run-ansible.sh deploy --tags cve_update` |
+| [Remove python3-pip](cve-update/README.md#remove-python3-pip) | Remove `python3-pip` from CVE target hosts when pip is not required. | `./scripts/run-ansible.sh deploy --tags python3_pip_remove` |
 | [Installation Cleanup](installation-cleanup/README.md) | Clean all contents under `/media/installation`. | `./scripts/run-ansible.sh deploy --tags installation_cleanup` |
 | [DNS And Time Services](dns-time-services/README.md) | Deploy DNS and time server containers together. | `./scripts/run-ansible.sh deploy --tags dns_time_services` |
 | [DNS Server](dns-server/README.md) | Deploy only the BIND DNS container. | `./scripts/run-ansible.sh deploy --tags dns_server` |

@@ -58,7 +58,7 @@ load_ansible_env() {
       tldh_database)
         printf '%s\n' "70-tldh-database.env"
         ;;
-      package_update|cve_update)
+      package_update|cve_update|python3_pip_remove|cve_python3_pip_remove)
         printf '%s\n' "80-package-update.env"
         ;;
       all|always)

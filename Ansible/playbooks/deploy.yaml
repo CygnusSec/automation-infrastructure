@@ -129,6 +129,28 @@
     - package_update
     - cve_update
 
+- name: Remove python3-pip package
+  hosts: "{{ lookup('env', 'ANSIBLE_PYTHON3_PIP_REMOVE_TARGET_GROUP') | default('package_update_targets', true) }}"
+  gather_facts: false
+  become: true
+  vars:
+    python3_pip_remove_packages: "{{ lookup('env', 'ANSIBLE_PYTHON3_PIP_REMOVE_PACKAGES') | default('[python3-pip]', true) | from_yaml }}"
+    python3_pip_remove_purge: "{{ (lookup('env', 'ANSIBLE_PYTHON3_PIP_REMOVE_PURGE') | default('false', true)) | bool }}"
+    python3_pip_remove_autoremove: "{{ (lookup('env', 'ANSIBLE_PYTHON3_PIP_REMOVE_AUTOREMOVE') | default('true', true)) | bool }}"
+  tasks:
+    - name: Remove python3-pip packages
+      ansible.builtin.apt:
+        name: "{{ python3_pip_remove_packages }}"
+        state: absent
+        purge: "{{ python3_pip_remove_purge }}"
+        autoremove: "{{ python3_pip_remove_autoremove }}"
+      tags:
+        - python3_pip_remove
+        - cve_python3_pip_remove
+  tags:
+    - python3_pip_remove
+    - cve_python3_pip_remove
+
 - name: Clean installation staging directory
   hosts: "{{ lookup('env', 'ANSIBLE_INSTALLATION_CLEANUP_TARGET_GROUP') | default('all_targets', true) }}"
   gather_facts: false

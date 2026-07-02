@@ -19,7 +19,7 @@ ANSIBLE_PACKAGE_UPDATE_REPO_SOURCE=./repo/update
 ANSIBLE_PACKAGE_UPDATE_REPO_DEST=/media/installation/update
 ANSIBLE_PACKAGE_UPDATE_CLEANUP_INSTALLATION_DIR=true
 ANSIBLE_PACKAGE_UPDATE_INSTALLATION_DIR=/media/installation
-ANSIBLE_PACKAGE_UPDATE_PACKAGES="[{name: vim, version: '2:9.1.0016-1ubuntu7.15'}, {name: vim-common, version: '2:9.1.0016-1ubuntu7.15'}, {name: vim-runtime, version: '2:9.1.0016-1ubuntu7.15'}, {name: vim-tiny, version: '2:9.1.0016-1ubuntu7.15'}, {name: xxd, version: '2:9.1.0016-1ubuntu7.15'}, {name: python3-pip, version: '24.0+dfsg-1ubuntu1.3+esm1'}, {name: python3-wheel, version: '0.42.0-2ubuntu0.1~esm1'}]"
+ANSIBLE_PACKAGE_UPDATE_PACKAGES="[{name: vim, version: '2:9.1.0016-1ubuntu7.15'}, {name: vim-common, version: '2:9.1.0016-1ubuntu7.15'}, {name: vim-runtime, version: '2:9.1.0016-1ubuntu7.15'}, {name: vim-tiny, version: '2:9.1.0016-1ubuntu7.15'}, {name: xxd, version: '2:9.1.0016-1ubuntu7.15'}, {name: python3-wheel, version: '0.42.0-2ubuntu0.1~esm1'}]"
 ```
 
 Run:
