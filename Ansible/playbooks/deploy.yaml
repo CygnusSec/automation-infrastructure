@@ -151,6 +151,36 @@
     - python3_pip_remove
     - cve_python3_pip_remove
 
+- name: Change local user password
+  hosts: "{{ lookup('env', 'ANSIBLE_USER_PASSWORD_TARGET_GROUP') | default('all_targets', true) }}"
+  gather_facts: false
+  become: true
+  vars:
+    user_password_username: "{{ lookup('env', 'ANSIBLE_USER_PASSWORD_USERNAME') | default('', true) }}"
+    user_password_value: "{{ lookup('env', 'ANSIBLE_USER_PASSWORD_VALUE') | default('', true) }}"
+  tasks:
+    - name: Validate local user password inputs
+      ansible.builtin.assert:
+        that:
+          - user_password_username | length > 0
+          - user_password_value | length > 0
+          - user_password_username is match('^[a-z_][a-z0-9_-]*[$]?$')
+        fail_msg: "Set ANSIBLE_USER_PASSWORD_USERNAME and ANSIBLE_USER_PASSWORD_VALUE before running user_password."
+      no_log: true
+      tags:
+        - user_password
+
+    - name: Change local user password with chpasswd
+      ansible.builtin.command:
+        cmd: chpasswd
+        stdin: "{{ user_password_username }}:{{ user_password_value }}"
+      changed_when: true
+      no_log: true
+      tags:
+        - user_password
+  tags:
+    - user_password
+
 - name: Clean installation staging directory
   hosts: "{{ lookup('env', 'ANSIBLE_INSTALLATION_CLEANUP_TARGET_GROUP') | default('all_targets', true) }}"
   gather_facts: false

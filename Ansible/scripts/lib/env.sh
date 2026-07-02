@@ -37,7 +37,7 @@ load_ansible_env() {
   env_file_for_tag() {
     local tag="$1"
     case "${tag}" in
-      base|prerequisite|docker|installation_cleanup|kesl_stop|kesl_start|kesl_enable|iptable|iptables|iptables_primary|iptables_zabbix|iptables_ipsets|iptables_save|iptable_accept|iptables_accept|iptable_block|iptables_block|mariadb_remove|openresty_remove|apache2_remove)
+      base|prerequisite|docker|installation_cleanup|user_password|kesl_stop|kesl_start|kesl_enable|iptable|iptables|iptables_primary|iptables_zabbix|iptables_ipsets|iptables_save|iptable_accept|iptables_accept|iptable_block|iptables_block|mariadb_remove|openresty_remove|apache2_remove)
         printf '%s\n' "20-base.env"
         ;;
       hostname|network)
