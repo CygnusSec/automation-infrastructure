@@ -32,6 +32,13 @@ data "vsphere_network" "extra" {
   datacenter_id = data.vsphere_datacenter.this.id
 }
 
+data "vsphere_datastore" "data_disk" {
+  count = local.resolved_data_disk_datastore != null && length(var.data_disks) > 0 ? 1 : 0
+
+  name          = local.resolved_data_disk_datastore
+  datacenter_id = data.vsphere_datacenter.this.id
+}
+
 data "vsphere_virtual_machine" "template" {
   name          = var.template_name
   datacenter_id = data.vsphere_datacenter.this.id
@@ -46,15 +53,21 @@ locals {
   resolved_guest_id         = var.guest_id != "" ? var.guest_id : data.vsphere_virtual_machine.template.guest_id
   resolved_adapter_type     = var.adapter_type != "" ? var.adapter_type : try(data.vsphere_virtual_machine.template.network_interface_types[0], "vmxnet3")
   resolved_thin_provisioned = var.thin_provisioned != null ? var.thin_provisioned : try(data.vsphere_virtual_machine.template.disks[0].thin_provisioned, true)
+  resolved_disk_size_gb     = var.disk_size_gb != null ? var.disk_size_gb : data.vsphere_virtual_machine.template.disks[0].size
+  resolved_data_disk_datastore = var.data_disk_datastore == null ? null : (
+    trimspace(var.data_disk_datastore) == "" ? null : trimspace(var.data_disk_datastore)
+  )
   resolved_data_disks = [
     for index, disk in var.data_disks : merge(disk, {
-      device = coalesce(disk.device, "/dev/sd${chr(98 + index)}")
+      device      = coalesce(disk.device, format("/dev/sd%s", substr("bcdefghijklmno", index, 1)))
+      unit_number = index < 6 ? index + 1 : index + 2
     })
   ]
 
   metadata = templatefile("${path.module}/templates/metadata.yaml.tftpl", {
     instance_id        = coalesce(var.instance_id, var.vm_name)
     hostname           = var.hostname
+    manage_network     = !var.enable_customization
     use_dhcp           = local.use_dhcp
     ipv4_address       = var.ipv4_address
     ipv4_prefix_length = var.ipv4_prefix_length
@@ -68,6 +81,7 @@ locals {
     default_user_password     = var.default_user_password
     ssh_authorized_keys       = var.ssh_authorized_keys
     extra_cloud_init_userdata = var.extra_cloud_init_userdata
+    manage_network            = !var.enable_customization
     data_disks                = local.resolved_data_disks
   })
 }
@@ -113,17 +127,18 @@ resource "vsphere_virtual_machine" "this" {
 
   disk {
     label            = "disk0"
-    size             = var.disk_size_gb
+    size             = local.resolved_disk_size_gb
     thin_provisioned = local.resolved_thin_provisioned
   }
 
   dynamic "disk" {
-    for_each = var.data_disks
+    for_each = local.resolved_data_disks
     content {
       label            = coalesce(disk.value.label, "disk${disk.key + 1}")
       size             = disk.value.size_gb
       thin_provisioned = disk.value.thin_provisioned
-      unit_number      = disk.key + 1
+      unit_number      = disk.value.unit_number
+      datastore_id     = local.resolved_data_disk_datastore != null ? data.vsphere_datastore.data_disk[0].id : null
     }
   }
 
@@ -164,6 +179,23 @@ resource "vsphere_virtual_machine" "this" {
         ipv4_gateway    = local.use_dhcp ? "" : var.ipv4_gateway
         dns_server_list = var.dns_servers
       }
+    }
+  }
+
+  lifecycle {
+    precondition {
+      condition     = local.resolved_disk_size_gb >= data.vsphere_virtual_machine.template.disks[0].size
+      error_message = "disk_size_gb cannot be smaller than the source template OS disk."
+    }
+
+    precondition {
+      condition     = length(distinct([for disk in local.resolved_data_disks : disk.device])) == length(local.resolved_data_disks)
+      error_message = "Effective data disk device paths must be unique after automatic defaults are applied."
+    }
+
+    precondition {
+      condition     = var.enable_customization || length(var.extra_network_interfaces) == 0
+      error_message = "extra_network_interfaces requires enable_customization=true because the cloud-init fallback cannot map multiple NICs reliably."
     }
   }
 

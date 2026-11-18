@@ -60,3 +60,6 @@ Ansible/docs/Operations.md
 .kiro
 .codex
 .agents
+
+# Local OS/editor metadata
+.DS_Store

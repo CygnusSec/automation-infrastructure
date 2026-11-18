@@ -95,9 +95,9 @@ variable "memory_hot_add_enabled" {
 }
 
 variable "disk_size_gb" {
-  description = "Default disk size in GB. Must not be smaller than the template disk."
+  description = "Default OS disk size in GB. The compatibility default preserves existing devops-infra VMs; set null globally for new groups that should inherit the template size."
   type        = number
-  default     = 50
+  default     = 120
 }
 
 variable "firmware" {
@@ -179,6 +179,18 @@ variable "ssh_authorized_keys" {
   default     = []
 }
 
+variable "enable_customization" {
+  description = "Enable vSphere guest customization by default."
+  type        = bool
+  default     = true
+}
+
+variable "data_disk_datastore" {
+  description = "Default datastore for additional data disks. Null or empty uses the OS disk datastore."
+  type        = string
+  default     = null
+}
+
 variable "vms" {
   description = "VMs to manage. The map key is the stable Terraform state identity; use vm_name when the vCenter VM name must differ from the key."
   type = map(object({
@@ -212,6 +224,7 @@ variable "vms" {
     default_user_password      = optional(string)
     ssh_authorized_keys        = optional(list(string))
     extra_cloud_init_userdata  = optional(string, "")
+    enable_customization       = optional(bool)
     data_disks = optional(list(object({
       size_gb          = number
       mount_path       = string
@@ -224,6 +237,7 @@ variable "vms" {
       ipv4_address = optional(string, "")
       ipv4_netmask = optional(number, 24)
     })), [])
+    data_disk_datastore = optional(string)
   }))
   default = {}
 }

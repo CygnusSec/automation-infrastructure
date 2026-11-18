@@ -34,6 +34,25 @@ jobs:
         working-directory: Terraform
         run: terraform fmt -check -recursive
 
+      - name: Check Terraform standalone bundle inputs
+        working-directory: Terraform
+        run: |
+          test -f .gitignore
+          test -f .dockerignore
+          test -f .env.compose.example
+          test -f .env.terraform.example
+          test -f README.md
+          test -f docker-compose.yml
+          test -d docker
+          test -d docs
+          test -d envs
+          test -d modules
+          test -d scripts
+
+      - name: Parse Terraform variable examples
+        working-directory: Terraform
+        run: bash scripts/check-tfvars-examples.sh
+
       - name: Initialize Terraform
         working-directory: ${{ env.TF_ENV }}
         run: terraform init -backend=false -lockfile=readonly
@@ -89,6 +108,7 @@ jobs:
         run: |
           bash -n Terraform/scripts/run-terraform.sh
           bash -n Terraform/scripts/build-docker-offline-bundle.sh
+          bash -n Terraform/scripts/check-tfvars-examples.sh
           bash -n Ansible/scripts/run-ansible.sh
           bash -n Ansible/scripts/run-ssh-copy-id-password.sh
           bash -n Ansible/scripts/build-offline-bundle.sh

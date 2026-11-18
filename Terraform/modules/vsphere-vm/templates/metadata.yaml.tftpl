@@ -1,5 +1,6 @@
 instance-id: ${instance_id}
 local-hostname: ${hostname}
+%{ if manage_network ~}
 network:
   version: 2
   ethernets:
@@ -12,10 +13,18 @@ network:
       dhcp4: false
       addresses:
         - ${ipv4_address}/${ipv4_prefix_length}
+%{ if ipv4_gateway != "" ~}
       gateway4: ${ipv4_gateway}
+%{ endif ~}
+%{ if length(dns_servers) > 0 ~}
       nameservers:
         addresses:
 %{ for dns in dns_servers ~}
           - ${dns}
 %{ endfor ~}
+%{ endif ~}
+%{ endif ~}
+%{ else ~}
+network:
+  config: disabled
 %{ endif ~}

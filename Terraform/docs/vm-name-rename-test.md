@@ -1,5 +1,8 @@
 # Test Case: Rename a vCenter VM with `vm_name`
 
+> Historical evidence: configuration values in this document describe the
+> tested snapshot. Current defaults and validation may differ.
+
 Test date: 2026-04-20
 
 ## Goal

@@ -1,0 +1,25 @@
+vms = {
+  vpn-16-01 = {
+    hostname           = "vpn-16-01"
+    host               = "x.x.x.16"
+    template_name      = "VPN-TEMPLATE"
+    network            = "VPN-SERVER"
+    ipv4_address       = "x.x.x.102"
+    ipv4_prefix_length = 24
+    ipv4_gateway       = "x.x.x.1"
+    dns_servers        = ["x.x.x.10", "x.x.x.11"]
+
+    extra_network_interfaces = [
+      {
+        network      = "APP-SERVER"
+        ipv4_address = "y.y.y.102"
+        ipv4_netmask = 24
+      },
+      {
+        network      = "VM Network"
+        ipv4_address = "z.z.z.102"
+        ipv4_netmask = 24
+      }
+    ]
+  }
+}

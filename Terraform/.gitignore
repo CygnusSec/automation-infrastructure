@@ -1,0 +1,29 @@
+# Terraform local working directories
+**/.terraform/
+.terraformrc.offline
+
+# Terraform state and plans
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+tfplan.*
+plan.out
+
+# Local Terraform variable files
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+!*.tfvars.json.example
+
+# Runtime, credentials, providers, and offline artifacts
+.env
+.env.compose
+.env.terraform
+.docker-cache/
+offline-dist/
+providers/
+
+# Local editor and OS metadata
+.DS_Store
+.vscode/

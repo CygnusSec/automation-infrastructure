@@ -35,23 +35,96 @@ package_reboot_if_required: false
 runcmd:
   - rm -f /etc/sudoers.d/90-cloud-init-users
   - visudo -cf /etc/sudoers.d/99-${default_user}-cloud-init || rm -f /etc/sudoers.d/99-${default_user}-cloud-init
+%{ if manage_network ~}
   - |
     # Remove template's old netplan config so cloud-init network takes effect
     find /etc/netplan -name '*.yaml' -not -name '50-cloud-init.yaml' -delete
     netplan apply
+%{ endif ~}
 %{ for i, disk in data_disks ~}
   - |
+    set -eu
     DISK="${disk.device}"
-    if [ ! -b "$${DISK}1" ]; then
-      parted -s $${DISK} mklabel gpt
-      parted -s $${DISK} mkpart primary ext4 0% 100%
+    MOUNT_PATH="${disk.mount_path}"
+    case "$${DISK}" in
+      /dev/nvme*|/dev/mmcblk*) PARTITION="$${DISK}p1" ;;
+      /dev/disk/by-id/*) PARTITION="$${DISK}-part1" ;;
+      *) PARTITION="$${DISK}1" ;;
+    esac
+
+    retry=0
+    until [ -b "$${DISK}" ]; do
+      retry=$((retry + 1))
+      if [ "$${retry}" -ge 30 ]; then
+        echo "Data disk did not appear: $${DISK}" >&2
+        exit 1
+      fi
       sleep 2
-      mkfs.ext4 -F $${DISK}1
+    done
+    udevadm settle || true
+
+    if lsblk -nr -o MOUNTPOINTS "$${DISK}" | grep -qx '/'; then
+      echo "Refusing to modify root filesystem disk: $${DISK}" >&2
+      exit 1
     fi
-    mkdir -p ${disk.mount_path}
-    if ! grep -q "$${DISK}1" /etc/fstab; then
-      echo "$${DISK}1 ${disk.mount_path} ext4 defaults,nofail 0 2" >> /etc/fstab
+
+    PARTITION_COUNT="$(lsblk -nr -o TYPE "$${DISK}" | awk '$1 == "part" { count++ } END { print count + 0 }')"
+    if [ "$${PARTITION_COUNT}" -gt 1 ]; then
+      echo "Refusing to use $${DISK}: expected at most one partition, found $${PARTITION_COUNT}" >&2
+      exit 1
     fi
-    mount -a
+
+    if [ ! -b "$${PARTITION}" ]; then
+      if [ "$${PARTITION_COUNT}" -ne 0 ]; then
+        echo "Refusing to repartition $${DISK}: an unexpected partition layout already exists" >&2
+        exit 1
+      fi
+      parted -s "$${DISK}" mklabel gpt
+      parted -s "$${DISK}" mkpart primary ext4 0% 100%
+      partprobe "$${DISK}" || true
+      udevadm settle || true
+
+      retry=0
+      until [ -b "$${PARTITION}" ]; do
+        retry=$((retry + 1))
+        if [ "$${retry}" -ge 15 ]; then
+          echo "Data disk partition did not appear: $${PARTITION}" >&2
+          exit 1
+        fi
+        sleep 2
+      done
+    fi
+
+    FILESYSTEM_TYPE="$(blkid -o value -s TYPE "$${PARTITION}" 2>/dev/null || true)"
+    if [ -z "$${FILESYSTEM_TYPE}" ]; then
+      mkfs.ext4 -F "$${PARTITION}"
+      FILESYSTEM_TYPE="ext4"
+    elif [ "$${FILESYSTEM_TYPE}" != "ext4" ]; then
+      echo "Refusing to reformat $${PARTITION}: found filesystem $${FILESYSTEM_TYPE}" >&2
+      exit 1
+    fi
+
+    FILESYSTEM_UUID="$(blkid -o value -s UUID "$${PARTITION}")"
+    if [ -z "$${FILESYSTEM_UUID}" ]; then
+      echo "Could not determine filesystem UUID for $${PARTITION}" >&2
+      exit 1
+    fi
+
+    mkdir -p "$${MOUNT_PATH}"
+    EXISTING_SPEC="$(awk -v path="$${MOUNT_PATH}" '$1 !~ /^#/ && $2 == path { print $1; exit }' /etc/fstab)"
+    if [ -n "$${EXISTING_SPEC}" ] && [ "$${EXISTING_SPEC}" != "UUID=$${FILESYSTEM_UUID}" ]; then
+      echo "Refusing to replace existing fstab owner for $${MOUNT_PATH}: $${EXISTING_SPEC}" >&2
+      exit 1
+    fi
+    if [ -z "$${EXISTING_SPEC}" ]; then
+      echo "UUID=$${FILESYSTEM_UUID} $${MOUNT_PATH} ext4 defaults,nofail 0 2" >> /etc/fstab
+    fi
+    mount "$${MOUNT_PATH}" || mount -a
+    MOUNTED_DEVICE="$(findmnt -n -o SOURCE --target "$${MOUNT_PATH}")"
+    MOUNTED_UUID="$(blkid -o value -s UUID "$${MOUNTED_DEVICE}" 2>/dev/null || true)"
+    if [ "$${MOUNTED_UUID}" != "$${FILESYSTEM_UUID}" ]; then
+      echo "Mount verification failed for $${MOUNT_PATH}: expected UUID $${FILESYSTEM_UUID}" >&2
+      exit 1
+    fi
 %{ endfor ~}
 ${extra_cloud_init_userdata}

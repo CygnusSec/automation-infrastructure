@@ -7,6 +7,8 @@ It is designed to:
 - Clone Linux VMs from existing vCenter templates.
 - Pass cloud-init metadata and user data through VMware `guestinfo`.
 - Manage multiple VMs from Terraform variable files.
+- Preserve the `devops-infra` VM-group/state workflow inside the
+  `automation-infrastructure` runtime and CI conventions.
 - Keep the host machine clean by running Terraform inside Docker.
 
 ## Prerequisites
@@ -25,6 +27,8 @@ vCenter needs:
 - A datastore
 - A port group or network
 - A Linux template with `cloud-init` and `open-vm-tools`
+- For `data_disks`, the template must also provide `parted`, `e2fsprogs`,
+  `util-linux` (`lsblk`, `blkid`, `findmnt`), `udev`, `awk`, and `grep`
 
 ## Repository Layout
 
@@ -38,6 +42,7 @@ modules/vsphere-vm/            Reusable VM module
 scripts/run-terraform.sh       Docker wrapper for Terraform commands
 scripts/build-docker-offline-bundle.sh
 docker-compose.yml             Terraform runtime image build/run config
+.dockerignore                  Minimal, secret-safe Docker build context
 .env.compose.example           Docker Compose/runtime environment example
 .env.terraform.example         Terraform environment variable example
 ```
@@ -66,6 +71,9 @@ Use `.env.compose` for Docker/runtime settings such as `TERRAFORM_IMAGE` and `TE
 Use `.env.terraform` for secrets or values you want to inject as Terraform environment variables, for example `TF_VAR_vsphere_password`.
 
 Use `.auto.tfvars` files for normal Terraform configuration. Terraform automatically loads files ending in `.auto.tfvars`.
+
+`vms.auto.tfvars.example` is retained only for the legacy single-state mode.
+Do not activate it together with grouped `vms/*.tfvars` files.
 
 The main Terraform files you normally edit are:
 
@@ -97,7 +105,7 @@ folder        = null
 
 num_cpus     = 2
 memory_mb    = 2048
-disk_size_gb = 50
+disk_size_gb = null # Preserve the template OS disk size.
 
 default_user = "ubuntu"
 ssh_authorized_keys = [
@@ -147,10 +155,9 @@ vms = {
     ipv4_address       = "y.y.y.160"
     ipv4_prefix_length = 24
     ipv4_gateway       = "y.y.y.1"
-    dns_servers        = ["y.y.y.10", "y.y.y.11"]
     num_cpus           = 2
     memory_mb          = 2048
-    disk_size_gb       = 50
+    disk_size_gb       = null
   }
 }
 ```
@@ -192,10 +199,19 @@ Common per-VM fields:
 - `default_user_password`
 - `ssh_authorized_keys`
 - `extra_cloud_init_userdata`
+- `enable_customization`
 - `extra_network_interfaces`
 - `data_disks`
+- `data_disk_datastore`
 
 Use `ipv4_address = "dhcp"` or leave `ipv4_address` empty to use DHCP for the primary interface.
+
+The environment keeps a compatibility default of 120 GB because the reviewed
+`devops-infra` states use 120 GB OS disks. New deployments may set the global
+`disk_size_gb = null` to inherit the template size. An explicit value may
+expand the disk, but it cannot be smaller than the template disk and Terraform
+cannot shrink an existing virtual disk. Never switch an imported group from
+120 to null until its template and current state sizes have been compared.
 
 ## Separate VM Groups And State
 
@@ -210,21 +226,34 @@ envs/vcenter/
   terraform.auto.tfvars
   vms/
     vms-vpn-15.tfvars
+    vms-vpn-16.tfvars
     vms-tldh-17.tfvars
     vms-tldh-18.tfvars
-    vms-data.tfvars
+    vms-tldh-19.tfvars
+    vms-tldh-20.tfvars
   states/
     terraform-vpn-15.tfstate
+    terraform-vpn-16.tfstate
     terraform-tldh-17.tfstate
     terraform-tldh-18.tfstate
-    terraform-data.tfstate
+    terraform-tldh-19.tfstate
+    terraform-tldh-20.tfstate
 ```
+
+The historical real `vms-data.tfvars` is an alternative view of VMs already
+owned by TLDH states. It is intentionally excluded from the active tree above;
+create a data state only after assigning every VM key to exactly one state.
 
 Prepare a VM group file:
 
 ```bash
 cp envs/vcenter/vms/vms-tldh-17.tfvars.example envs/vcenter/vms/vms-tldh-17.tfvars
 ```
+
+Repository examples use sanitized keys and values. They are suitable for new,
+disposable states only and are not address-compatible with transferred
+production state. For migration, securely transfer the exact real group file
+without changing its `vms` map keys.
 
 Put only the ESXi `172.16.9.17` VMs in `envs/vcenter/vms/vms-tldh-17.tfvars`:
 
@@ -257,9 +286,6 @@ Examples by ESXi host:
 
 # ESXi 172.16.9.18
 ./scripts/run-terraform.sh envs/vcenter apply -var-file=vms/vms-tldh-18.tfvars -state=states/terraform-tldh-18.tfstate
-
-# Data VMs with SAN data disks
-./scripts/run-terraform.sh envs/vcenter apply -var-file=vms/vms-data.tfvars -state=states/terraform-data.tfstate
 ```
 
 Preview changes:
@@ -285,8 +311,10 @@ Useful state commands for one group:
 ./scripts/run-terraform.sh envs/vcenter output -state=states/terraform-tldh-17.tfstate
 ```
 
-Keep VM map keys unique across files unless you intentionally manage separate
-vCenter VM objects with separate state files.
+Keep VM map keys unique across active files and states. The historical
+`devops-infra` `vms-data.tfvars` file overlaps VM keys already owned by TLDH
+groups and has no matching state; treat it as an alternative grouping until
+ownership is reconciled. Never apply overlapping groups as separate states.
 
 ### Additional Network Interfaces
 
@@ -307,11 +335,21 @@ extra_network_interfaces = [
 ]
 ```
 
+Multi-NIC VMs require `enable_customization = true` so vSphere customization
+can map interfaces in their declared order. When customization is enabled,
+cloud-init does not render or replace Netplan. When it is disabled, cloud-init
+owns the primary interface and extra interfaces are rejected because there is
+no stable MAC/interface mapping.
+
 ### Additional Data Disks
 
-Use `data_disks` to attach extra disks. The cloud-init user data partitions, formats, mounts, and persists these disks in `/etc/fstab`.
+Use `data_disks` to attach extra disks. On the first clone boot, cloud-init
+waits for each disk, rejects multiple/unexpected partitions and non-ext4
+filesystems, creates ext4 when needed, and persists the verified mount by UUID.
 
 ```hcl
+data_disk_datastore = "san-datastore"
+
 data_disks = [
   {
     size_gb          = 100
@@ -324,8 +362,25 @@ data_disks = [
 ```
 
 `device` is optional. When it is omitted, the module assumes `/dev/sdb` for the
-first data disk, `/dev/sdc` for the second, and so on. Set it explicitly when
-the guest OS exposes disks with stable names such as `/dev/disk/by-id/...`.
+first data disk, `/dev/sdc` for the second, and so on, while skipping the
+reserved SCSI unit. At most 14 data disks are supported on the default
+controller. Explicit `/dev/sdX`, NVMe, MMC, and `/dev/disk/by-id/...` paths are
+accepted; partition suffixes are resolved for each path type.
+
+`data_disk_datastore` is VM-level and applies to every additional disk on that
+VM. Omit it or set it to null/empty to let vSphere use the VM's OS datastore.
+Changing it for an existing disk may cause a storage move or replacement,
+depending on the provider plan, so always review the plan.
+
+Cloud-init `runcmd` is per-instance. Adding `data_disks` to an already-created
+VM can attach the VMDK without rerunning the guest mount script. Use the
+Ansible `external_disk` role or another idempotent in-guest procedure for
+existing VMs; the cloud-init disk workflow is for clone-time initialization.
+
+Choose exactly one disk-configuration owner. If Terraform cloud-init formats
+and mounts a disk through `data_disks`, do not run the Ansible `external_disk`
+role for that disk. If Ansible owns partitioning/mounting, attach the disk in a
+separate Terraform design that does not render a mount action in cloud-init.
 
 ## Terraform Workflow
 
@@ -333,9 +388,9 @@ Run Terraform through the Docker wrapper:
 
 ```bash
 ./scripts/run-terraform.sh envs/vcenter validate
-./scripts/run-terraform.sh envs/vcenter plan
-./scripts/run-terraform.sh envs/vcenter apply
-./scripts/run-terraform.sh envs/vcenter output
+./scripts/run-terraform.sh envs/vcenter plan -var-file=vms/vms-tldh-17.tfvars -state=states/terraform-tldh-17.tfstate
+./scripts/run-terraform.sh envs/vcenter apply -var-file=vms/vms-tldh-17.tfvars -state=states/terraform-tldh-17.tfstate
+./scripts/run-terraform.sh envs/vcenter output -state=states/terraform-tldh-17.tfstate
 ```
 
 The wrapper:
@@ -362,17 +417,19 @@ docker run --rm --user "$(id -u):$(id -g)" \
 Useful state commands:
 
 ```bash
-./scripts/run-terraform.sh envs/vcenter state list
-./scripts/run-terraform.sh envs/vcenter state show 'module.vsphere_vm["test-vcenter-01"].vsphere_virtual_machine.this'
+./scripts/run-terraform.sh envs/vcenter state list -state=states/terraform-tldh-17.tfstate
+./scripts/run-terraform.sh envs/vcenter state show -state=states/terraform-tldh-17.tfstate 'module.vsphere_vm["REAL_MAP_KEY"].vsphere_virtual_machine.this'
 ```
 
 ## CI
 
-GitHub Actions runs on pushes to `main` or `master`, pull requests, and manual dispatch.
+GitHub Actions runs on pushes to `develop`, `main`, or `master`, pull requests,
+and manual dispatch.
 
 The CI workflow checks:
 
 - Terraform formatting with `terraform fmt -check -recursive`
+- Parsing and formatting all committed `*.tfvars.example` files
 - Terraform initialization and validation for `envs/vcenter`
 - Shell syntax for scripts in `scripts/`
 - Docker Compose config rendering
@@ -391,7 +448,7 @@ After a successful `apply`:
 Check outputs with:
 
 ```bash
-./scripts/run-terraform.sh envs/vcenter output
+./scripts/run-terraform.sh envs/vcenter output -state=states/terraform-tldh-17.tfstate
 ```
 
 ## Registry or Offline Usage
@@ -410,28 +467,41 @@ To build an offline bundle:
 
 ```bash
 ./scripts/build-docker-offline-bundle.sh envs/vcenter
+# ARM64 destination:
+OFFLINE_PLATFORM=linux/arm64 ./scripts/build-docker-offline-bundle.sh envs/vcenter
 ```
 
 If a `providers` directory exists and contains Terraform providers, `scripts/run-terraform.sh` configures Terraform to use that local provider mirror.
 
 The offline bundle script reads `.env.compose`, copies both environment examples, and writes the packaged runtime image setting to `.env.compose` inside the generated project.
 
+The bundle deliberately excludes real `.env.terraform`, tfvars, and state
+files. Transfer those separately through a secure channel after extraction.
+The Terraform build context is also restricted by `.dockerignore`, so local
+credentials, states, and provider caches are not sent to the Docker daemon.
+The offline image and provider mirror target Linux AMD64 by default. Set
+`OFFLINE_PLATFORM=linux/arm64` when the disconnected destination is ARM64.
+The regular runtime Dockerfile automatically selects the Terraform binary for
+the Docker target architecture (`amd64` or `arm64`).
+
 ## Troubleshooting
 
 - Template is missing `open-vm-tools`: Terraform may wait a long time for a guest IP.
 - Template is missing the VMware or OVF cloud-init datasource: the VM may be created but cloud-init will not apply guest settings.
 - Incorrect `cluster` or `host`: planning may pass, but apply can fail during vCenter lookups.
-- `disk_size_gb` is smaller than the template disk: apply will fail.
+- `disk_size_gb` is smaller than the template disk: the resource precondition fails during planning.
 - Template firmware does not match the configured firmware: the guest may fail to boot.
 - Guest network settings are wrong: verify `ipv4_address`, `ipv4_prefix_length`, `ipv4_gateway`, DNS, and port group names.
 
 ## Important Files
 
 - `envs/vcenter/terraform.auto.tfvars`
-- `envs/vcenter/vms.auto.tfvars`
+- `envs/vcenter/vms/*.tfvars`
 - `envs/vcenter/terraform.auto.tfvars.example`
-- `envs/vcenter/vms.auto.tfvars.example`
+- `envs/vcenter/vms/*.tfvars.example`
 - `.env.compose.example`
 - `.env.terraform.example`
+- `.dockerignore`
 - `scripts/run-terraform.sh`
 - `docker-compose.yml`
+- `docs/devops-infra-migration.md`

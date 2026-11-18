@@ -18,7 +18,7 @@ module "vsphere_vm" {
   memory_mb                  = coalesce(each.value.memory_mb, var.memory_mb)
   cpu_hot_add_enabled        = coalesce(each.value.cpu_hot_add_enabled, var.cpu_hot_add_enabled)
   memory_hot_add_enabled     = coalesce(each.value.memory_hot_add_enabled, var.memory_hot_add_enabled)
-  disk_size_gb               = coalesce(each.value.disk_size_gb, var.disk_size_gb)
+  disk_size_gb               = each.value.disk_size_gb != null ? each.value.disk_size_gb : var.disk_size_gb
   firmware                   = each.value.firmware != null ? each.value.firmware : var.firmware
   guest_id                   = each.value.guest_id != null ? each.value.guest_id : var.guest_id
   adapter_type               = each.value.adapter_type != null ? each.value.adapter_type : var.adapter_type
@@ -34,7 +34,9 @@ module "vsphere_vm" {
   default_user_password      = each.value.default_user_password != null ? each.value.default_user_password : var.default_user_password
   ssh_authorized_keys        = coalesce(each.value.ssh_authorized_keys, var.ssh_authorized_keys)
   extra_cloud_init_userdata  = each.value.extra_cloud_init_userdata
+  enable_customization       = each.value.enable_customization != null ? each.value.enable_customization : var.enable_customization
   data_disks                 = each.value.data_disks
+  data_disk_datastore        = each.value.data_disk_datastore != null ? each.value.data_disk_datastore : var.data_disk_datastore
   extra_network_interfaces   = each.value.extra_network_interfaces
 }
 

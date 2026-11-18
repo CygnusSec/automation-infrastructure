@@ -92,7 +92,7 @@ Create local configuration from examples:
 cp .env.compose.example .env.compose
 cp .env.terraform.example .env.terraform
 cp envs/vcenter/terraform.auto.tfvars.example envs/vcenter/terraform.auto.tfvars
-cp envs/vcenter/vms.auto.tfvars.example envs/vcenter/vms.auto.tfvars
+cp envs/vcenter/vms/vms-tldh-17.tfvars.example envs/vcenter/vms/vms-tldh-17.tfvars
 ```
 
 Edit the vCenter connection, template, network, datastore, and VM definitions.
@@ -100,8 +100,8 @@ Then run Terraform through the wrapper:
 
 ```bash
 ./scripts/run-terraform.sh envs/vcenter validate
-./scripts/run-terraform.sh envs/vcenter plan
-./scripts/run-terraform.sh envs/vcenter apply
+./scripts/run-terraform.sh envs/vcenter plan -var-file=vms/vms-tldh-17.tfvars -state=states/terraform-tldh-17.tfstate
+./scripts/run-terraform.sh envs/vcenter apply -var-file=vms/vms-tldh-17.tfvars -state=states/terraform-tldh-17.tfstate
 ```
 
 See `Terraform/README.md` for all VM fields and offline bundle instructions.
@@ -206,8 +206,8 @@ Typical online flow:
 
 ```bash
 cd Terraform
-./scripts/run-terraform.sh envs/vcenter plan
-./scripts/run-terraform.sh envs/vcenter apply
+./scripts/run-terraform.sh envs/vcenter plan -var-file=vms/vms-tldh-17.tfvars -state=states/terraform-tldh-17.tfstate
+./scripts/run-terraform.sh envs/vcenter apply -var-file=vms/vms-tldh-17.tfvars -state=states/terraform-tldh-17.tfstate
 
 cd ../Ansible
 ./scripts/run-ansible.sh deploy
@@ -269,6 +269,16 @@ Ansible/repo/docker-images/
 
 - Keep local `.env`, `Ansible/env.d/*.env`, `.env.compose`, `.env.terraform`,
   secrets, state files, and package payloads out of git.
+- Keep every Terraform VM map key in exactly one active state. Do not apply the
+  historical standalone data grouping while the same keys are owned by TLDH
+  states.
+- Treat committed VM examples as sanitized fresh-state samples only. When
+  reusing production state, securely transfer the exact real tfvars and keep
+  every original `vms` map key unchanged.
+- Terraform and Ansible must not manage the same network or disk concurrently.
+  If Terraform cloud-init owns a data disk, disable the Ansible `external_disk`
+  role for it. If Terraform/vSphere customization owns initial networking, run
+  the Ansible `network` role only for an intentional handover.
 - Change hostnames and static IP addresses with `--limit` one host at a time.
 - For Docker Swarm, define manager and worker groups before running the Swarm
   role.

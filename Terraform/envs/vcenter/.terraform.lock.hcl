@@ -6,6 +6,7 @@ provider "registry.terraform.io/vmware/vsphere" {
   constraints = "~> 2.6"
   hashes = [
     "h1:LVNXdKuRSgKD99OVbw4LKcg+6kMyUqgor/qeV8ccBIU=",
+    "h1:kM/bChs7p+7AnS4f/SAj3NMsabaRH/VZ7vfyBZAkzso=",
     "zh:5417b09a076571e9b15289998dd43439416f4f972d75d55ed207bd7cdb0ec9dc",
     "zh:6614a8f5d997bb9fd8dc6e8793795f4047c8a9404540b487a8a80faf29686b27",
     "zh:680432f500856e988b2537f88b12b5f5af0b71cf25312c6918c21a7d9bc4383c",

@@ -1,0 +1,11 @@
+vms = {
+  tldh-20-01 = {
+    hostname           = "tldh-20-01"
+    host               = "x.x.x.20"
+    network            = "MANAGEMENT"
+    ipv4_address       = "y.y.y.151"
+    ipv4_prefix_length = 24
+    ipv4_gateway       = "y.y.y.1"
+    dns_servers        = ["y.y.y.10", "y.y.y.11"]
+  }
+}

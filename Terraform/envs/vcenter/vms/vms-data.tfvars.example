@@ -1,3 +1,6 @@
+# Sanitized fresh-state example only. The historical real devops-infra data
+# group uses different keys that overlap TLDH states; never pair this example
+# with transferred production state or activate overlapping real groups.
 vms = {
   data-01 = {
     hostname           = "data-01"
@@ -8,11 +11,14 @@ vms = {
     ipv4_gateway       = "x.x.x.1"
     dns_servers        = ["x.x.x.10", "x.x.x.11"]
 
+    # Applies to every additional disk on this VM. Omit to use the OS datastore.
+    data_disk_datastore = "san-datastore"
+
     data_disks = [
       {
-        size_gb          = 100
-        mount_path       = "/data"
-        label            = "data"
+        size_gb    = 100
+        mount_path = "/data"
+        label      = "data"
         # Optional. Defaults to /dev/sdb for the first data disk, /dev/sdc for
         # the second, and so on.
         device           = "/dev/sdb"

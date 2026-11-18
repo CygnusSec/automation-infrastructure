@@ -1,5 +1,13 @@
 cluster = null
 
+# Common non-secret defaults may live here instead of .env.terraform.
+# Required connection credentials should remain in .env.terraform.
+# Null is for a fresh deployment that should inherit the template disk. When
+# importing devops-infra state, preserve/backfill 120 GB until plans are clean.
+disk_size_gb         = null
+enable_customization = true
+data_disk_datastore  = null
+
 # Host-to-datastore mapping: define once, then VMs automatically use the datastore for their host.
 host_datastore_map = {
   "x.x.x.15" = "datastore1 (5)"

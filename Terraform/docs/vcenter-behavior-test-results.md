@@ -1,5 +1,8 @@
 # vCenter Behavior Test Results
 
+> Historical evidence: sizes, defaults, and environment values in this document
+> describe the tested snapshot. Current defaults and validation may differ.
+
 Test date: 2026-04-20
 
 Terraform-managed VM:
